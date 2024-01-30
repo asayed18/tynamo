@@ -1,5 +1,11 @@
 # @asalam/tynamo
 
+## 1.1.1
+
+### Patch Changes
+
+- adding husky package
+
 ## 1.1.0
 
 ### Minor Changes
