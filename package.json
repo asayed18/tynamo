@@ -5,6 +5,7 @@
   "module": "dist/index.mjs",
   "types": "dist/index.d.ts",
   "author": "Ahmed Abdelsalam <engahmedabdelsalam918@gmail.com>",
+  "homepage": "https://github.com/ahmed-abdelsalam/tynamo/#readme",
   "license": "MIT",
   "scripts": {
     "build": "tsup ./src/index.ts --format cjs,esm --dts-resolve",
