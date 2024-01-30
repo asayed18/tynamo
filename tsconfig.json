@@ -2,12 +2,11 @@
     "compileOnSave": false,
     "compilerOptions": {
         "allowSyntheticDefaultImports": true,
-        "composite": true,
+        // "composite": true,
         "declaration": true,
         "declarationMap": false,
         "esModuleInterop": true,
         "forceConsistentCasingInFileNames": true,
-        "incremental": true,
         "resolveJsonModule": true,
         "skipLibCheck": true,
         "sourceMap": false,
@@ -21,6 +20,7 @@
         "noUncheckedIndexedAccess": true,
         "noEmit": true,
         "baseUrl": ".",
+        "rootDir": ".",
         "paths": {
             "@_/*": [
                 "src/*"
@@ -36,13 +36,16 @@
         ]
     },
     "include": [
-        "./**/*.ts"
+        "src/**/*"
+    ],
+    "files": [
+        "package.json"
     ],
     "exclude": [
-        "./node_modules",
-        "./dist",
-        "./src/tests",
-        "./src/**/*.test.ts",
-        "./src/**/*.spec.ts"
+        "node_modules",
+        "dist",
+        "src/tests",
+        "src/**/*.test.ts",
+        "src/**/*.spec.ts"
     ]
 }

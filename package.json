@@ -4,13 +4,10 @@
   "main": "dist/index.js",
   "module": "dist/index.mjs",
   "types": "dist/index.d.ts",
-  "files": [
-    "dist"
-  ],
   "author": "Ahmed Abdelsalam <engahmedabdelsalam918@gmail.com>",
   "license": "MIT",
   "scripts": {
-    "build": "tsup src/index.ts --format cjs --minify --dts-resolve",
+    "build": "tsup ./src/index.ts --format cjs,esm --dts-resolve",
     "lint": "tsc",
     "test": "jest ."
   },
@@ -23,6 +20,7 @@
     "access": "public"
   },
   "devDependencies": {
+    "@changesets/cli": "^2.27.1",
     "@faker-js/faker": "^8.4.0",
     "@shelf/jest-dynamodb": "^3.4.1",
     "@types/aws-sdk": "^2.7.0",
