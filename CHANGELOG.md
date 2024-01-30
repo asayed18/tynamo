@@ -1,5 +1,11 @@
 # @asalam/tynamo
 
+## 0.4.3
+
+### Patch Changes
+
+- ca19cb9: fix release workflow #1
+
 ## 0.4.2
 
 ### Patch Changes
