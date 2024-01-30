@@ -1,5 +1,11 @@
 # @asalam/tynamo
 
+## 0.4.5
+
+### Patch Changes
+
+- d1e1dfe: return back npmrc
+
 ## 0.4.4
 
 ### Patch Changes
