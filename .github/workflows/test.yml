@@ -11,7 +11,7 @@ permissions:
 jobs:
   testing:
     runs-on: ubuntu-latest
-
+    environment: production
     steps:
       - name: Checkout the repo
         uses: actions/checkout@v2
@@ -42,8 +42,9 @@ jobs:
       - name: Create Coverage Badge
         uses: schneegans/dynamic-badges-action@v1.1.0
         with:
-          auth: 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  
+          auth: ${{ secrets.GIST_SECRET }}  
           gistID: b02d36156f391f6361f4bab90974c47a
+
           filename: tynamo.json
           label: coverage
           message: ${{ env.COVERAGE }}
