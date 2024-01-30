@@ -1,5 +1,11 @@
 # @asalam/tynamo
 
+## 0.4.2
+
+### Patch Changes
+
+- 1e6b465: fix npm login
+
 ## 0.4.1
 
 ### Patch Changes
