@@ -156,17 +156,21 @@ export class Tynamo<PK extends string, SK extends string | undefined> {
     }
 
     async batchWriteRecord(records: CompositeKeySchema<PK, SK>[]) {
-        const command = new BatchWriteItemCommand({
+        // distribute records into chunks of 25
+        const chunks = []
+        while (records.length > 0) {
+            chunks.push(records.splice(0, 25))
+        }
+        const promises = chunks.map(chunk => this.send({
             RequestItems: {
-
-                [this.tableName]: records.map(p => ({
+                [this.tableName]: chunk.map(p => ({
                     PutRequest: {
                         Item: marshall(p),
                     },
                 })),
             },
-        })
-        return this.send(command, 'BatchWriteRecord')
+        }, 'BatchWriteRecord'))
+        return Promise.all(promises)
     }
 
     /**
@@ -175,16 +179,21 @@ export class Tynamo<PK extends string, SK extends string | undefined> {
      * @returns A promise that resolves when the batch delete operation is complete.
      */
     async batchDeleteRecord(records: CompositeKeySchema<PK, SK>[]) {
-        const command = new BatchWriteItemCommand({
+        const chunks = []
+        while (records.length > 0) {
+            chunks.push(records.splice(0, 25))
+        }
+        const promises = chunks.map(chunk => this.send({
             RequestItems: {
-                [this.tableName]: records.map(p => ({
+                [this.tableName]: chunk.map(p => ({
                     DeleteRequest: {
                         Key: this.keys(p),
                     },
                 })),
             },
-        })
-        return this.send(command, 'BatchDeleteRecord')
+        }, 'BatchDeleteRecord'))
+
+        return Promise.all(promises)
     }
 
     private async updateItem(params: UpdateItemCommandInput) {

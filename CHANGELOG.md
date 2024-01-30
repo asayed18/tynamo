@@ -1,5 +1,11 @@
 # @asalam/tynamo
 
+## 1.0.0
+
+### Major Changes
+
+- Bugfix: chunckify the list of reocrds to 25 records each for batchOperations
+
 ## 0.4.7
 
 ### Patch Changes
