@@ -161,7 +161,7 @@ export class Tynamo<PK extends string, SK extends string | undefined> {
         while (records.length > 0) {
             chunks.push(records.splice(0, 25))
         }
-        const promises = chunks.map(chunk => this.send({
+        const promises = chunks.map(chunk => this.send(new BatchWriteItemCommand({
             RequestItems: {
                 [this.tableName]: chunk.map(p => ({
                     PutRequest: {
@@ -169,7 +169,7 @@ export class Tynamo<PK extends string, SK extends string | undefined> {
                     },
                 })),
             },
-        }, 'BatchWriteRecord'))
+        }), 'BatchWriteRecord'))
         return Promise.all(promises)
     }
 
@@ -183,7 +183,7 @@ export class Tynamo<PK extends string, SK extends string | undefined> {
         while (records.length > 0) {
             chunks.push(records.splice(0, 25))
         }
-        const promises = chunks.map(chunk => this.send({
+        const promises = chunks.map(chunk => this.send(new BatchWriteItemCommand({
             RequestItems: {
                 [this.tableName]: chunk.map(p => ({
                     DeleteRequest: {
@@ -191,7 +191,7 @@ export class Tynamo<PK extends string, SK extends string | undefined> {
                     },
                 })),
             },
-        }, 'BatchDeleteRecord'))
+        }), 'BatchDeleteRecord'))
 
         return Promise.all(promises)
     }

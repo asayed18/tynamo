@@ -1,5 +1,11 @@
 # @asalam/tynamo
 
+## 1.1.0
+
+### Minor Changes
+
+- Adding pre-commit
+
 ## 1.0.1
 
 ### Patch Changes
