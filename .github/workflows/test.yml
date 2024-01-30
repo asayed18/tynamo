@@ -1,0 +1,59 @@
+name: Testing
+
+on: [push]
+
+permissions:
+  contents: read
+  id-token: write
+  actions: read
+
+
+jobs:
+  testing:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout the repo
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      - name: Use Node.js
+        uses: actions/setup-node@v3
+        with:
+          cache: 'yarn'
+          registry-url: 'https://npm.pkg.github.com'
+
+      - name: yarn install
+        run: yarn install
+
+      - name: Linting
+        run: yarn lint
+
+      - name: Testing
+        run: yarn test
+
+      - name: testing with coverage
+        run: |
+          SUMMARY="$(yarn test | tail -3 | head -1)"
+          TOKENS=($SUMMARY)
+          echo "COVERAGE=$(echo ${TOKENS[2]})" >> $GITHUB_ENV
+      
+      - name: Create Coverage Badge
+        uses: schneegans/dynamic-badges-action@v1.1.0
+        with:
+          auth: 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  
+          gistID: b02d36156f391f6361f4bab90974c47a
+          filename: tynamo.json
+          label: coverage
+          message: ${{ env.COVERAGE }}
+          namedLogo: jest
+          color: blue
+          logoColor: lightblue
+        
+  build:
+    needs: [testing]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Job for branch status check
+        run: echo Build complete
