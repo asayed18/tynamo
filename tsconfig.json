@@ -1,0 +1,48 @@
+{
+    "compileOnSave": false,
+    "compilerOptions": {
+        "allowSyntheticDefaultImports": true,
+        "composite": true,
+        "declaration": true,
+        "declarationMap": false,
+        "esModuleInterop": true,
+        "forceConsistentCasingInFileNames": true,
+        "incremental": true,
+        "resolveJsonModule": true,
+        "skipLibCheck": true,
+        "sourceMap": false,
+        "strict": true,
+        "strictNullChecks": true,
+        "outDir": "./dist",
+        "moduleResolution": "node",
+        "emitDecoratorMetadata": true,
+        "experimentalDecorators": true,
+        "importHelpers": true,
+        "noUncheckedIndexedAccess": true,
+        "noEmit": true,
+        "baseUrl": ".",
+        "paths": {
+            "@_/*": [
+                "src/*"
+            ]
+        },
+        "plugins": [
+            {
+                "transform": "@zerollup/ts-transform-paths",
+                "exclude": [
+                    "*"
+                ]
+            }
+        ]
+    },
+    "include": [
+        "./**/*.ts"
+    ],
+    "exclude": [
+        "./node_modules",
+        "./dist",
+        "./src/tests",
+        "./src/**/*.test.ts",
+        "./src/**/*.spec.ts"
+    ]
+}

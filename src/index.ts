@@ -1,0 +1,1 @@
+export { Tynamo as DynamoDB } from '@_/tynamo'

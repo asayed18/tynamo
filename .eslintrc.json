@@ -1,0 +1,140 @@
+{
+  "root": true,
+  // "ignorePatterns": [
+  //   "**/*"
+  // ],
+  "env": {
+    "jest/globals": true
+  },
+  "parser": "@typescript-eslint/parser",
+  "plugins": [
+    "jest",
+    "prettier",
+    "sort-exports",
+    "@typescript-eslint",
+    "simple-import-sort"
+  ],
+  "settings": {
+    "import/parsers": {
+      "@typescript-eslint-parser": [
+        ".ts",
+        ".tsx"
+      ]
+    }
+  },
+  "extends": [
+    "eslint:recommended",
+    "eslint-config-airbnb-base",
+    "plugin:@typescript-eslint/eslint-recommended",
+    "plugin:@typescript-eslint/recommended",
+    "prettier"
+  ],
+  "overrides": [
+    {
+      "files": [
+        "*.ts",
+        "*.tsx"
+      ],
+      "rules": {
+        // CUSTOM RULES
+        "no-param-reassign": 0,
+        "no-await-in-loop": 0,
+        "no-restricted-syntax": 0,
+        "no-promise-executor-return": 0,
+        "no-prototype-builtins": 0,
+        "guard-for-in": 0,
+        "no-console": 0,
+        "simple-import-sort/imports": "error",
+        "simple-import-sort/exports": "error",
+        "no-unexpected-multiline": "error",
+        "no-multiple-empty-lines": "error",
+        "no-shadow": "off",
+        "@typescript-eslint/no-shadow": [
+          "error"
+        ],
+        "@typescript-eslint/no-explicit-any": 0,
+        "@typescript-eslint/no-non-null-assertion": 0,
+        "camelcase": "warn",
+        "arrow-spacing": "error",
+        "arrow-parens": [
+          "error",
+          "as-needed"
+        ],
+        "arrow-body-style": [
+          "error",
+          "as-needed"
+        ],
+        "max-len": [
+          "error",
+          120
+        ],
+        "no-empty-function": "warn",
+        "no-use-before-define": "error",
+        "no-useless-rename": "error",
+        "comma-dangle": [
+          "warn",
+          "always-multiline"
+        ],
+        "comma-style": [
+          "error",
+          "last"
+        ],
+        "no-unused-expressions": "off",
+        "no-return-await": "warn",
+        "no-unused-vars": "off",
+        "@typescript-eslint/no-unused-vars": [
+          "warn",
+          {
+            "args": "none",
+            "argsIgnorePattern": "^_"
+          }
+        ],
+        "quotes": [
+          "error",
+          "single",
+          {
+            "avoidEscape": true,
+            "allowTemplateLiterals": true
+          }
+        ],
+        "semi": [
+          "error",
+          "never"
+        ],
+        "@typescript-eslint/semi": [
+          "error",
+          "never"
+        ],
+        "semi-style": [
+          "error",
+          "first"
+        ],
+        "eqeqeq": [
+          "error",
+          "smart"
+        ],
+        "import/extensions": [
+          "error",
+          {
+            "*": "ignorePackages",
+            "js": "never",
+            "jsx": "never",
+            "ts": "never",
+            "tsx": "never"
+          }
+        ],
+        "import/prefer-default-export": "off",
+        "import/no-unresolved": "off"
+      }
+    },
+    {
+      "files": [
+        "*.js",
+        "*.jsx"
+      ],
+      "rules": {
+        "@typescript-eslint/no-var-requires": "off"
+      }
+    }
+  ]
+}

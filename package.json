@@ -1,0 +1,50 @@
+{
+  "name": "@asalam/tynamo",
+  "version": "0.1.2",
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "author": "Ahmed Abdelsalam <engahmedabdelsalam918@gmail.com>",
+  "license": "MIT",
+  "scripts": {
+    "build": "tsup src/index.ts --format cjs --minify --dts-resolve",
+    "lint": "tsc",
+    "test": "jest ."
+  },
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.474.0",
+    "@aws-sdk/util-dynamodb": "^3.474.0",
+    "@smithy/node-http-handler": "^2.3.1"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "devDependencies": {
+    "@faker-js/faker": "^8.4.0",
+    "@shelf/jest-dynamodb": "^3.4.1",
+    "@types/aws-sdk": "^2.7.0",
+    "@types/jest": "^29.5.11",
+    "@types/reflect-metadata": "^0.1.0",
+    "@typescript-eslint/eslint-plugin": "^5.57.1",
+    "@typescript-eslint/parser": "^5.38.0",
+    "@zerollup/ts-transform-paths": "^1.7.18",
+    "aws-sdk": "^2.1348.0",
+    "eslint": "^8.26.0",
+    "eslint-config-airbnb": "19.0.4",
+    "eslint-config-prettier": "^8.5.0",
+    "eslint-plugin-import": "^2.26.0",
+    "eslint-plugin-jest": "^27.2.3",
+    "eslint-plugin-prettier": "^4.2.1",
+    "eslint-plugin-simple-import-sort": "^8.0.0",
+    "eslint-plugin-sort-exports": "^0.7.0",
+    "faker": "^6.6.6",
+    "jest": "^29.7.0",
+    "prettier": "^2.8.7",
+    "ts-jest": "^29.1.1",
+    "tsup": "^8.0.1",
+    "typescript": "^5.3.3"
+  }
+}
