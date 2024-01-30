@@ -2101,7 +2101,7 @@
 
 "@smithy/node-http-handler@^2.3.1":
   version "2.3.1"
-  resolved "https://registry.npmjs.org/@smithy/node-http-handler/-/node-http-handler-2.3.1.tgz"
+  resolved "https://registry.yarnpkg.com/@smithy/node-http-handler/-/node-http-handler-2.3.1.tgz#77d23279ff0a12cbe7cde93c5e7c0e86ad56dd20"
   integrity sha512-gLA8qK2nL9J0Rk/WEZSvgin4AppvuCYRYg61dcUo/uKxvMZsMInL5I5ZdJTogOvdfVug3N2dgI5ffcUfS4S9PA==
   dependencies:
     "@smithy/abort-controller" "^2.1.1"

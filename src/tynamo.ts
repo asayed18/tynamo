@@ -169,6 +169,24 @@ export class Tynamo<PK extends string, SK extends string | undefined> {
         return this.send(command, 'BatchWriteRecord')
     }
 
+    /**
+     * Deletes multiple records from the DynamoDB table using batch write operation.
+     * @param records - An array of composite key schemas representing the records to be deleted.
+     * @returns A promise that resolves when the batch delete operation is complete.
+     */
+    async batchDeleteRecord(records: CompositeKeySchema<PK, SK>[]) {
+        const command = new BatchWriteItemCommand({
+            RequestItems: {
+                [this.tableName]: records.map(p => ({
+                    DeleteRequest: {
+                        Key: this.keys(p),
+                    },
+                })),
+            },
+        })
+        return this.send(command, 'BatchDeleteRecord')
+    }
+
     private async updateItem(params: UpdateItemCommandInput) {
         const command = new UpdateItemCommand(params)
         return this.send(command, 'UpdateItem') as Promise<UpdateItemCommandOutput>

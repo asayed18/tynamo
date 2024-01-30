@@ -1,8 +1,8 @@
 // import { config } from 'aws-sdk'
+import { DynamoDbSchema } from '@_/DynamoDbSchema'
+import { Tynamo } from '@_/tynamo'
 import { faker } from '@faker-js/faker'
 
-import { Tynamo } from '../tynamo'
-import { DynamoDbSchema } from '../DynamoDbSchema'
 import { DynamodbRecordFactory } from './factories/dynamodbRecordFactory'
 
 // config.update({
@@ -76,6 +76,15 @@ describe('DynamoDB', () => {
         for (const r of records) {
             const data = await dynamodb.getRecord(r.uuid as string, r.record_id as string)
             expect(data).toBeDefined()
+        }
+    })
+    test('batch delete records', async () => {
+        const records = Array(10).fill(0).map(_ => DynamodbRecordFactory.create())
+        await dynamodb.batchWriteRecord(records)
+        await dynamodb.batchDeleteRecord(records)
+        for (const r of records) {
+            const data = await dynamodb.getRecord(r.uuid as string, r.record_id as string)
+            expect(data).toBeFalsy()
         }
     })
 })
