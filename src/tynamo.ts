@@ -122,7 +122,7 @@ export class Tynamo<PK extends string, SK extends string | undefined> {
      * @param sk The optional sort key value.
      * @returns A promise that resolves to the retrieved item.
      */
-    async getRecord<T extends CompositeKeySchema<PK, SK>>(pk: string, sk?: string): Promise<T | null> {
+    async getRecord(pk: string, sk?: string): Promise<CompositeKeySchema<PK, SK> | null> {
         const keys = { [this.pk]: pk } as DynamoDbSchema
         if (this.sk && sk) keys[this.sk] = sk
 
@@ -134,7 +134,7 @@ export class Tynamo<PK extends string, SK extends string | undefined> {
             'GetItem',
         ) as GetItemCommandOutput
         if (resp.Item) {
-            return unmarshall(resp.Item) as T
+            return unmarshall(resp.Item)
         }
         return null
     }
