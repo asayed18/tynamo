@@ -20,21 +20,21 @@ jobs:
       - name: Use Node.js
         uses: actions/setup-node@v3
         with:
-          cache: 'yarn'
+          cache: 'npm'
           registry-url: 'https://npm.pkg.github.com'
 
-      - name: yarn install
-        run: yarn install
+      - name: npm install
+        run: npm install
 
       - name: Linting
-        run: yarn lint
+        run: npm run lint
 
       - name: Testing
-        run: yarn test
+        run: npm run test
 
       - name: testing with coverage
         run: |
-          SUMMARY="$(yarn test | tail -3 | head -1)"
+          SUMMARY="$(npm run test | tail -3 | head -1)"
           echo "COVERAGE=$(echo $SUMMARY | awk '{print $3}')" >> $GITHUB_ENV
       
       - name: Create Coverage Badge

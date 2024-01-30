@@ -21,10 +21,10 @@ jobs:
         - uses: actions/checkout@v2
         - uses: actions/setup-node@v3
           with:
-            cache: 'yarn'
+            cache: 'npm'
             node-version: 18
             registry-url: 'https://registry.npmjs.org'            
-        - run: yarn install --frozen-lockfile
+        - run: npm install --frozen-lockfile
         - name: Create release PR or publish
           id: release_step
           uses: changesets/action@v1
@@ -33,7 +33,7 @@ jobs:
             NPM_TOKEN: ${{ secrets.NPM_SECRET }}
             NODE_AUTH_TOKEN: ${{ secrets.NPM_SECRET }}
           with:
-            publish: yarn release
+            publish: npm run release
             createGithubReleases: true
     build:
       runs-on: ubuntu-latest

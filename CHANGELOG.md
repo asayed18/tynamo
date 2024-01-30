@@ -1,5 +1,11 @@
 # @asalam/tynamo
 
+## 1.0.1
+
+### Patch Changes
+
+- move to npm
+
 ## 1.0.0
 
 ### Major Changes
