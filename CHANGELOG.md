@@ -1,5 +1,11 @@
 # @asalam/tynamo
 
+## 0.4.6
+
+### Patch Changes
+
+- ab24f5e: update actions/setup-node@v2
+
 ## 0.4.5
 
 ### Patch Changes
