@@ -1,5 +1,11 @@
 # @asalam/tynamo
 
+## 0.4.1
+
+### Patch Changes
+
+- 716d052: Fixing release workflow
+
 ## 0.4.0
 
 ### Minor Changes
