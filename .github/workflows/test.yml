@@ -43,7 +43,7 @@ jobs:
         uses: schneegans/dynamic-badges-action@v1.1.0
         with:
           auth: ${{ secrets.GIST_SECRET }}  
-          gistID: b02d36156f391f6361f4bab90974c47a
+          gistID: 70e8c5f5a52c8c45b84351b01b698be4
 
           filename: tynamo.json
           label: coverage
