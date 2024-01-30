@@ -9,8 +9,9 @@
   "license": "MIT",
   "scripts": {
     "build": "tsup ./src/index.ts --format cjs,esm --dts-resolve",
+    "release": "yarn build; yarn changeset publish",
     "lint": "tsc",
-    "test": "jest ."
+    "test": "yarn jest --coverage --coverageReporters=text-summary --verbose --runInBand --forceExit --detectOpenHandles --testTimeout=10000"
   },
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.474.0",

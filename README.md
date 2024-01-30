@@ -1,4 +1,4 @@
-# Tynamo ![Test Status](https://github.com/ahmed-abdelsalam/tynamo/actions/workflows/test.yml/badge.svg) ![Coverage](https://img.shields.io/endpoint?url=https://gist.github.com/ahmed-abdelsalam/70e8c5f5a52c8c45b84351b01b698be4/raw/tynamo.json)
+# Tynamo ![Test Status](https://github.com/ahmed-abdelsalam/tynamo/actions/workflows/test.yml/badge.svg) ![Coverage](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/ahmed-abdelsalam/70e8c5f5a52c8c45b84351b01b698be4/raw/tynamo.json)
 
 This library provides a simplified interface for interacting with AWS DynamoDB, offering easy-to-use methods for common operations such as creating, updating, upserting, and querying records with support for nested attributes. It's designed to streamline the development process for applications that utilize DynamoDB by abstracting away some of the complexity involved in direct DynamoDB interactions.
 
