@@ -1,5 +1,11 @@
 # @asalam/tynamo
 
+## 0.4.4
+
+### Patch Changes
+
+- ef98dbf: remove extra npm file
+
 ## 0.4.3
 
 ### Patch Changes
