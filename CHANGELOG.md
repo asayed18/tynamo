@@ -1,5 +1,11 @@
 # @asalam/tynamo
 
+## 0.4.0
+
+### Minor Changes
+
+- fb82cb3: Adding batch delete records
+
 ## 0.3.0
 
 ### Minor Changes
