@@ -4,6 +4,13 @@ on:
     branches:
       - main
 concurrency: ${{ github.workflow }}-${{ github.ref }}
+
+permissions:
+  contents: read
+  packages: write
+  pull-requests: write
+  actions: write
+
 jobs:
     build:
         runs-on: ubuntu-latest
