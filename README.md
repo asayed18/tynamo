@@ -14,7 +14,7 @@ This library provides a simplified interface for interacting with AWS DynamoDB, 
 To use this library, you'll first need to install it via npm:
 
 ```bash
-npm install tynamo
+npm install @asalam/taynmo
 ```
 
 ## Configuration
