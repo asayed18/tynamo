@@ -22,7 +22,7 @@ npm install tynamo
 Before you can start using the library, you need to configure it with your DynamoDB settings. Here's an example:
 
 ```javascript
-const { Tynamo } = require('your-library-name');
+const { Tynamo } = require('@asalam/taynmo');
 
 const dynamodb = Tynamo.create('your-table-name', 'your-primary-key', 'your-sort-key', {
     region: 'your-region',
@@ -40,8 +40,6 @@ If you have only primary key without composite key you can use
 const dynamodb = Tynamo.createOnlyPk('your-table-name', 'your-primary-key');
 ```
 
-
-
 ## Usage
 
 ### Creating a Record
@@ -55,7 +53,11 @@ await dynamodb.putRecord(record);
 
 ```javascript
 const updatedRecord = { /* your updated record data */ };
+// Update specific fields inside a record
 await dynamodb.updateRecordIncluding(updatedRecord, ['path.to.attribute']);
+
+// Update all fields inside a record except for specific attributes
+await dynamodb.updateRecordExcluding(record, ['path.to.attribute']);
 ```
 
 ### Upserting a Record
