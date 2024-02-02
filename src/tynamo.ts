@@ -240,7 +240,6 @@ export class Tynamo<PK extends string, SK extends string | undefined> {
             include: false,
             record,
         })
-
         let conditionalExpression = `attribute_exists(#${this.pk})`
         ExpressionAttributeNames[`#${this.pk}`] = this.pk
         if (this.sk) {
@@ -262,7 +261,7 @@ export class Tynamo<PK extends string, SK extends string | undefined> {
         } catch (error) {
             const originalError = error as unknown as DynamodbError
             if (originalError.message === 'ConditionalCheckFailedException') {
-                return this.putRecord(record)
+                return this.putRecord(record, { marshallOptions: options?.marshallOptions })
             }
             throw error
         }
