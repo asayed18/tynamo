@@ -12,7 +12,7 @@ import {
     UpdateItemCommandInput,
     UpdateItemCommandOutput,
 } from '@aws-sdk/client-dynamodb'
-import { marshall, unmarshall } from '@aws-sdk/util-dynamodb'
+import { marshall, marshallOptions, unmarshall } from '@aws-sdk/util-dynamodb'
 import { NodeHttpHandler } from '@smithy/node-http-handler'
 
 import { CompositeKeySchema, DynamoDbSchema } from './DynamoDbSchema'
@@ -106,11 +106,11 @@ export class Tynamo<PK extends string, SK extends string | undefined> {
      * @param record The item to be inserted.
      * @returns A promise that resolves to the result of the PutItem operation.
      */
-    async putRecord<T extends CompositeKeySchema<PK, SK>>(record: T) {
+    async putRecord<T extends CompositeKeySchema<PK, SK>>(record: T, options?: { marshallOptions?: marshallOptions }) {
         return this.send(
             new PutItemCommand({
                 TableName: this.tableName,
-                Item: marshall(record),
+                Item: marshall(record, options?.marshallOptions),
             }),
             'PutItem',
         ) as Promise<PutItemCommandOutput>
@@ -155,7 +155,7 @@ export class Tynamo<PK extends string, SK extends string | undefined> {
         return marshall(keys)
     }
 
-    async batchWriteRecord(records: CompositeKeySchema<PK, SK>[]) {
+    async batchWriteRecord(records: CompositeKeySchema<PK, SK>[], options?: { marshallOptions?: marshallOptions }) {
         // distribute records into chunks of 25
         const chunks = []
         while (records.length > 0) {
@@ -165,7 +165,7 @@ export class Tynamo<PK extends string, SK extends string | undefined> {
             RequestItems: {
                 [this.tableName]: chunk.map(p => ({
                     PutRequest: {
-                        Item: marshall(p),
+                        Item: marshall(p, options?.marshallOptions),
                     },
                 })),
             },
@@ -208,12 +208,17 @@ export class Tynamo<PK extends string, SK extends string | undefined> {
      * @param {T} record - The record to update.
      * @returns {Promise<void>} - A promise that resolves when the update is complete.
      */
-    async updateRecordNested(record: CompositeKeySchema<PK, SK>) {
+    async updateRecordNested(record: CompositeKeySchema<PK, SK>, options?: { marshallOptions?: marshallOptions }) {
         const {
             UpdateExpression,
             ExpressionAttributeNames,
             ExpressionAttributeValues,
-        } = this.generateUpdateExpression({ record, include: false, exclude: [] })
+        } = this.generateUpdateExpression({
+            _marshallOptions: options?.marshallOptions,
+            exclude: [],
+            include: false,
+            record,
+        })
 
         return this.updateItem({
             TableName: this.tableName,
@@ -224,12 +229,17 @@ export class Tynamo<PK extends string, SK extends string | undefined> {
         })
     }
 
-    async upsertRecordNested(record: CompositeKeySchema<PK, SK>) {
+    async upsertRecordNested(record: CompositeKeySchema<PK, SK>, options?: { marshallOptions?: marshallOptions }) {
         const {
             UpdateExpression,
             ExpressionAttributeNames,
             ExpressionAttributeValues,
-        } = this.generateUpdateExpression({ record, include: false, exclude: [] })
+        } = this.generateUpdateExpression({
+            _marshallOptions: options?.marshallOptions,
+            exclude: [],
+            include: false,
+            record,
+        })
 
         let conditionalExpression = `attribute_exists(#${this.pk})`
         ExpressionAttributeNames[`#${this.pk}`] = this.pk
@@ -266,12 +276,20 @@ export class Tynamo<PK extends string, SK extends string | undefined> {
      * @param {string[]} exclude - The attributes to be excluded from the update.
      * @returns {Promise<void>} - A promise that resolves when the update is complete.
      */
-    async updateRecordExcluding(record: CompositeKeySchema<PK, SK>, exclude: string[]) {
+    async updateRecordExcluding(
+        record: CompositeKeySchema<PK, SK>, exclude: string[], options?: {
+            marshallOptions?: marshallOptions
+        }) {
         const {
             UpdateExpression,
             ExpressionAttributeNames,
             ExpressionAttributeValues,
-        } = this.generateUpdateExpression({ record, include: false, exclude })
+        } = this.generateUpdateExpression({
+            _marshallOptions: options?.marshallOptions,
+            exclude,
+            include: false,
+            record,
+        })
 
         return this.updateItem({
             TableName: this.tableName,
@@ -290,12 +308,16 @@ export class Tynamo<PK extends string, SK extends string | undefined> {
      * @param {string[]} include - The list of attributes to include in the update.
      * @returns {Promise<void>} - A promise that resolves when the update is complete.
      */
-    async updateRecordIncluding(record: CompositeKeySchema<PK, SK>, include: string[]) {
+    async updateRecordIncluding(
+        record: CompositeKeySchema<PK, SK>,
+        include: string[],
+        options?: { marshallOptions?: marshallOptions }
+    ) {
         const {
             UpdateExpression,
             ExpressionAttributeNames,
             ExpressionAttributeValues
-        } = this.generateUpdateExpression({ record, include, exclude: [] })
+        } = this.generateUpdateExpression({ _marshallOptions: options?.marshallOptions, record, include, exclude: [] })
 
         return this.updateItem({
             TableName: this.tableName,
@@ -325,10 +347,11 @@ export class Tynamo<PK extends string, SK extends string | undefined> {
      * @returns An object containing  UpdateExpression, ExpressionAttributeNames, and ExpressionAttributeValues.
      */
     private generateUpdateExpression(
-        { record, include, exclude }: {
-            record: CompositeKeySchema<PK, SK>;
-            include: boolean | string[];
+        { record, include, exclude, _marshallOptions }: {
+            _marshallOptions?: marshallOptions;
             exclude: string[];
+            include: boolean | string[];
+            record: CompositeKeySchema<PK, SK>;
         },
     ) {
         const expressionAttributeNames: any = {}
@@ -342,6 +365,7 @@ export class Tynamo<PK extends string, SK extends string | undefined> {
                 if (
                     currentKey === this.pk ||
                     currentKey === this.sk ||
+                    val === undefined ||
                     exclude.includes(currentKey) ||
                     (include === true || (Array.isArray(include) && !include.includes(currentKey)) && !recursive)
                 ) {
@@ -368,7 +392,7 @@ export class Tynamo<PK extends string, SK extends string | undefined> {
         return {
             UpdateExpression: updateExpression,
             ExpressionAttributeNames: expressionAttributeNames,
-            ExpressionAttributeValues: marshall(expressionAttributeValues),
+            ExpressionAttributeValues: marshall(expressionAttributeValues, _marshallOptions),
         }
     }
 
