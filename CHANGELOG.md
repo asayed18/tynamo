@@ -1,5 +1,11 @@
 # @asalam/tynamo
 
+## 1.2.0
+
+### Minor Changes
+
+- Adding Marshall options for marshalling records
+
 ## 1.1.1
 
 ### Patch Changes
