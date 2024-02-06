@@ -1,5 +1,11 @@
 # @asalam/tynamo
 
+## 2.0.0
+
+### Major Changes
+
+- Accept any level of nested record
+
 ## 1.3.0
 
 ### Minor Changes

@@ -14,6 +14,7 @@ import {
 } from '@aws-sdk/client-dynamodb'
 import { marshall, marshallOptions, unmarshall } from '@aws-sdk/util-dynamodb'
 import { NodeHttpHandler } from '@smithy/node-http-handler'
+import { merge, omit, pick } from 'lodash'
 
 import { CompositeKeySchema, DynamoDbSchema } from './DynamoDbSchema'
 
@@ -96,8 +97,7 @@ export class Tynamo<PK extends string, SK extends string | undefined> {
             return resp
         } catch (error) {
             const orig = error as unknown as Error
-            console.error(operation, orig)
-            throw new DynamodbError(orig.name, orig)
+            throw new DynamodbError(orig)
         }
     }
 
@@ -198,7 +198,7 @@ export class Tynamo<PK extends string, SK extends string | undefined> {
 
     private async updateItem(params: UpdateItemCommandInput) {
         const command = new UpdateItemCommand(params)
-        return this.send(command, 'UpdateItem') as Promise<UpdateItemCommandOutput>
+        return this.send(command, 'UpdateItemError') as Promise<UpdateItemCommandOutput>
     }
 
     /**
@@ -216,17 +216,28 @@ export class Tynamo<PK extends string, SK extends string | undefined> {
         } = this.generateUpdateExpression({
             _marshallOptions: options?.marshallOptions,
             exclude: [],
-            include: false,
+            include: true,
             record,
         })
-
-        return this.updateItem({
-            TableName: this.tableName,
-            Key: this.keys(record),
-            UpdateExpression,
-            ExpressionAttributeNames,
-            ExpressionAttributeValues,
-        })
+        try {
+            const response = this.updateItem({
+                TableName: this.tableName,
+                Key: this.keys(record),
+                UpdateExpression,
+                ExpressionAttributeNames,
+                ExpressionAttributeValues,
+            })
+            return response
+        }
+        catch (error) {
+            const origErr = error as unknown as Error
+            if (Tynamo.isNestedError(origErr)) {
+                const originalRecord = await this.getRecord(record[this.pk], this.sk && record[this.sk])
+                const mergedRecord = this.mergeRecords(record, originalRecord, true, [])
+                return this.updateItem(mergedRecord)
+            }
+            throw new DynamodbError(origErr)
+        }
     }
 
     async upsertRecordNested(record: CompositeKeySchema<PK, SK>, options?: { marshallOptions?: marshallOptions }) {
@@ -237,7 +248,7 @@ export class Tynamo<PK extends string, SK extends string | undefined> {
         } = this.generateUpdateExpression({
             _marshallOptions: options?.marshallOptions,
             exclude: [],
-            include: false,
+            include: true,
             record,
         })
         let conditionalExpression = `attribute_exists(#${this.pk})`
@@ -259,9 +270,19 @@ export class Tynamo<PK extends string, SK extends string | undefined> {
             })
             return resp
         } catch (error) {
-            const originalError = error as unknown as DynamodbError
-            if (originalError.message === 'ConditionalCheckFailedException') {
+            const origErr = error as unknown as DynamodbError
+            if (origErr.name === 'ConditionalCheckFailedException') {
+                console.warn('Tynamo::UpsertError::RecordNotFound::Inserting', pick(record, [this.pk, this.sk ?? '']))
                 return this.putRecord(record, { marshallOptions: options?.marshallOptions })
+            }
+            if (Tynamo.isNestedError(origErr)) {
+                console.warn(
+                    'Tynamo::UpdateNestedError::UnMatchedSchema::FetchingOriginalRecord',
+                    pick(record, [this.pk, this.sk ?? '']),
+                )
+                const originalRecord = await this.getRecord(record[this.pk], this.sk && record[this.sk])
+                const mergedRecord = this.mergeRecords(record, originalRecord, true, [])
+                return this.putRecord(mergedRecord, { marshallOptions: options?.marshallOptions })
             }
             throw error
         }
@@ -286,17 +307,27 @@ export class Tynamo<PK extends string, SK extends string | undefined> {
         } = this.generateUpdateExpression({
             _marshallOptions: options?.marshallOptions,
             exclude,
-            include: false,
+            include: true,
             record,
         })
-
-        return this.updateItem({
-            TableName: this.tableName,
-            Key: this.keys(record),
-            UpdateExpression,
-            ExpressionAttributeNames,
-            ExpressionAttributeValues,
-        })
+        try {
+            const resp = this.updateItem({
+                TableName: this.tableName,
+                Key: this.keys(record),
+                UpdateExpression,
+                ExpressionAttributeNames,
+                ExpressionAttributeValues,
+            })
+            return resp
+        } catch (error) {
+            const origErr = error as unknown as DynamodbError
+            if (Tynamo.isNestedError(origErr)) {
+                const originalRecord = await this.getRecord(record[this.pk], this.sk && record[this.sk])
+                const mergedRecord = this.mergeRecords(record, originalRecord, true, exclude)
+                return this.updateItem(mergedRecord)
+            }
+            throw error
+        }
     }
 
     /**
@@ -310,28 +341,42 @@ export class Tynamo<PK extends string, SK extends string | undefined> {
     async updateRecordIncluding(
         record: CompositeKeySchema<PK, SK>,
         include: string[],
-        options?: { marshallOptions?: marshallOptions }
+        options?: { marshallOptions?: marshallOptions },
     ) {
         const {
             UpdateExpression,
             ExpressionAttributeNames,
-            ExpressionAttributeValues
-        } = this.generateUpdateExpression({ _marshallOptions: options?.marshallOptions, record, include, exclude: [] })
-
-        return this.updateItem({
-            TableName: this.tableName,
-            Key: this.keys(record),
-            UpdateExpression,
-            ExpressionAttributeNames,
             ExpressionAttributeValues,
-        })
+        } = this.generateUpdateExpression({ _marshallOptions: options?.marshallOptions, record, include, exclude: [] })
+        try {
+            return this.updateItem({
+                TableName: this.tableName,
+                Key: this.keys(record),
+                UpdateExpression,
+                ExpressionAttributeNames,
+                ExpressionAttributeValues,
+            })
+        } catch (error) {
+            const origErr = error as unknown as DynamodbError
+            if (Tynamo.isNestedError(origErr)) {
+                const originalRecord = await this.getRecord(record[this.pk], this.sk && record[this.sk])
+                const mergedRecord = this.mergeRecords(record, originalRecord, include, [])
+                return this.updateItem(mergedRecord)
+            }
+            throw error
+        }
     }
 
     static isNestedRecord(value: unknown): value is DynamoDbSchema {
-        if (!value || typeof value !== 'object') {
-            return false
+        if (value && typeof value === 'object' && Object.keys(value).length > 0) {
+            return true
         }
-        return true
+        return false
+    }
+
+    static isNestedError(err: Error): boolean {
+        return err.name === 'ValidationException' &&
+            err.message.includes('path provided in the update expression is invalid for update')
     }
 
     /**
@@ -357,6 +402,7 @@ export class Tynamo<PK extends string, SK extends string | undefined> {
         const expressionAttributeValues: any = {}
         const updateExpressions: string[] = []
 
+        const tagify = (key: string) => `${key.split('.').map(k => `#${convertToUnderscore(k)}`).join('.')}`
         const traverseAttributes = (attributes: CompositeKeySchema<PK, SK>, parentKey?: string) => {
             for (const [key, val] of Object.entries(attributes)) {
                 const currentKey = parentKey ? `${parentKey}.${key}` : key
@@ -366,7 +412,7 @@ export class Tynamo<PK extends string, SK extends string | undefined> {
                     currentKey === this.sk ||
                     val === undefined ||
                     exclude.includes(currentKey) ||
-                    (include === true || (Array.isArray(include) && !include.includes(currentKey)) && !recursive)
+                    (include === false || (Array.isArray(include) && !include.includes(currentKey)) && !recursive)
                 ) {
                     // eslint-disable-next-line no-continue
                     continue
@@ -374,7 +420,7 @@ export class Tynamo<PK extends string, SK extends string | undefined> {
                 if (recursive) {
                     traverseAttributes(val, currentKey)
                 } else {
-                    const placeholder = `${currentKey.split('.').map(k => `#${convertToUnderscore(k)}`).join('.')}`
+                    const placeholder = tagify(currentKey)
                     const valuePlaceholder = `:value${Object.keys(expressionAttributeValues).length + 1}`
 
                     currentKey.split('.').forEach(k => { expressionAttributeNames[`#${convertToUnderscore(k)}`] = k })
@@ -395,4 +441,32 @@ export class Tynamo<PK extends string, SK extends string | undefined> {
         }
     }
 
+    /**
+     * Merges two records together based on the specified criteria.
+     * 
+     * @param newRecord - The new record to merge.
+     * @param oldRecord - The old record to merge.
+     * @param include - Determines which properties to include in the merged record. 
+     *                  If `true`, all properties are included. 
+     *                  If an array of strings, only the specified properties are included.
+     *                  Default is `true`.
+     * @param exclude - An array of properties to exclude from the merged record. 
+     *                  Default is an empty array.
+     * @returns The merged record.
+    */
+    // eslint-disable-next-line class-methods-use-this
+    private mergeRecords(
+        newRecord: CompositeKeySchema<PK, SK>,
+        oldRecord: CompositeKeySchema<PK, SK>,
+        include: boolean | string[] = true,
+        exclude: string[] = [],
+    ): CompositeKeySchema<PK, SK> {
+        const excludedNewReocrd = omit(newRecord, exclude)
+        if (include === true) return merge(oldRecord, excludedNewReocrd) as CompositeKeySchema<PK, SK>
+        if (Array.isArray(include)) {
+            const includedNewRecord = pick(newRecord, excludedNewReocrd)
+            return merge(oldRecord, includedNewRecord) as CompositeKeySchema<PK, SK>
+        }
+        return oldRecord
+    }
 }

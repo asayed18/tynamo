@@ -1,8 +1,9 @@
 export class DynamodbError extends Error {
 
-    constructor(message: string, orig?: Error) {
-        super(message)
-        this.name = 'DynamodbError'
-        if (orig) this.stack = orig.stack
+    constructor(orig: Error) {
+        super(orig.message)
+        this.message = orig.message || 'DynamodbError'
+        this.name = orig.name
+        this.stack = orig.stack
     }
 }
