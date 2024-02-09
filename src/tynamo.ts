@@ -214,7 +214,7 @@ export class Tynamo<PK extends string, SK extends string | undefined> {
             ExpressionAttributeNames,
             ExpressionAttributeValues,
         } = this.generateUpdateExpression({
-            _marshallOptions: options?.marshallOptions,
+            _marshallOptions: { removeUndefinedValues: true, ...options?.marshallOptions },
             exclude: [],
             include: true,
             record,
@@ -246,9 +246,61 @@ export class Tynamo<PK extends string, SK extends string | undefined> {
             ExpressionAttributeNames,
             ExpressionAttributeValues,
         } = this.generateUpdateExpression({
-            _marshallOptions: options?.marshallOptions,
+            _marshallOptions: { removeUndefinedValues: true, ...options?.marshallOptions },
             exclude: [],
             include: true,
+            record,
+        })
+        let conditionalExpression = `attribute_exists(#${this.pk})`
+        ExpressionAttributeNames[`#${this.pk}`] = this.pk
+        if (this.sk) {
+            conditionalExpression += ` and attribute_exists(#${this.sk})`
+            ExpressionAttributeNames[`#${this.sk}`] = this.sk
+        }
+
+        try {
+            const resp = await this.updateItem({
+                TableName: this.tableName,
+                Key: this.keys(record),
+                UpdateExpression,
+                ExpressionAttributeNames,
+                ConditionExpression: conditionalExpression,
+                ExpressionAttributeValues,
+                ReturnValuesOnConditionCheckFailure: 'ALL_OLD',
+            })
+            return resp
+        } catch (error) {
+            const origErr = error as unknown as DynamodbError
+            if (origErr.name === 'ConditionalCheckFailedException') {
+                console.warn('Tynamo::UpsertError::RecordNotFound::Inserting', pick(record, [this.pk, this.sk ?? '']))
+                return this.putRecord(record, { marshallOptions: options?.marshallOptions })
+            }
+            if (Tynamo.isNestedError(origErr)) {
+                console.warn(
+                    'Tynamo::UpdateNestedError::UnMatchedSchema::FetchingOriginalRecord',
+                    pick(record, [this.pk, this.sk ?? '']),
+                )
+                const originalRecord = await this.getRecord(record[this.pk], this.sk && record[this.sk])
+                const mergedRecord = this.mergeRecords(record, originalRecord, true, [])
+                return this.putRecord(mergedRecord, { marshallOptions: options?.marshallOptions })
+            }
+            throw error
+        }
+    }
+
+    async upsertRecordIncluding(
+        record: CompositeKeySchema<PK, SK>,
+        include: string[],
+        options?: { marshallOptions?: marshallOptions },
+    ) {
+        const {
+            UpdateExpression,
+            ExpressionAttributeNames,
+            ExpressionAttributeValues,
+        } = this.generateUpdateExpression({
+            _marshallOptions: { removeUndefinedValues: true, ...options?.marshallOptions },
+            exclude: [],
+            include,
             record,
         })
         let conditionalExpression = `attribute_exists(#${this.pk})`
@@ -305,7 +357,7 @@ export class Tynamo<PK extends string, SK extends string | undefined> {
             ExpressionAttributeNames,
             ExpressionAttributeValues,
         } = this.generateUpdateExpression({
-            _marshallOptions: options?.marshallOptions,
+            _marshallOptions: { removeUndefinedValues: true, ...options?.marshallOptions },
             exclude,
             include: true,
             record,
@@ -347,7 +399,12 @@ export class Tynamo<PK extends string, SK extends string | undefined> {
             UpdateExpression,
             ExpressionAttributeNames,
             ExpressionAttributeValues,
-        } = this.generateUpdateExpression({ _marshallOptions: options?.marshallOptions, record, include, exclude: [] })
+        } = this.generateUpdateExpression({
+            _marshallOptions: { removeUndefinedValues: true, ...options?.marshallOptions },
+            record,
+            include,
+            exclude: [],
+        })
         try {
             return this.updateItem({
                 TableName: this.tableName,

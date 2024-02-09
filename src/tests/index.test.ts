@@ -53,6 +53,30 @@ describe('DynamoDB', () => {
         expect(resp).toBeDefined()
     })
 
+    test('upsert a record 2', async () => {
+
+        const updatedRecord = {
+            uuid: faker.string.uuid(),
+            record_id: faker.string.uuid(),
+            domain: 'marketing',
+            meta: faker.lorem.sentence(),
+            created_at: faker.date.past().toISOString(),
+            updated_at: faker.date.recent().toISOString(),
+            targets: new Set(['emarsys']),
+            data: {
+                baag_purchased_at: faker.date.past().toISOString(),
+                event_data: {},
+                team_name: faker.person.jobType(),
+                service_name: faker.internet.domainName(),
+            },
+            version: 4,
+        }
+
+        await dynamodb.upsertRecordNested(updatedRecord, { marshallOptions: { convertEmptyValues: false } })
+        const resp = await dynamodb.getRecord(updatedRecord.uuid, updatedRecord.record_id as string)
+        expect(resp).toBeDefined()
+    })
+
     test('upsert a record with nested level 3', async () => {
 
         const updatedRecord = {
@@ -65,8 +89,8 @@ describe('DynamoDB', () => {
                 newPath: {
                     thrdLevel: {
                         frthLevel: faker.string.uuid(),
-                    }
-                }
+                    },
+                },
             },
         }
 
