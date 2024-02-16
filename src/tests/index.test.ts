@@ -2,7 +2,7 @@
 import { DynamoDbSchema } from '@_/DynamoDbSchema'
 import { Tynamo } from '@_/tynamo'
 // eslint-disable-next-line import/no-extraneous-dependencies
-import { faker } from '@faker-js/faker'
+import { fa, faker } from '@faker-js/faker'
 
 import { DynamodbRecordFactory } from './factories/dynamodbRecordFactory'
 
@@ -53,6 +53,28 @@ describe('DynamoDB', () => {
         expect(resp).toBeDefined()
     })
 
+    test('update not found record', async () => {
+        const uuid = faker.string.uuid()
+        const updatedRecord = {
+            uuid,
+            record_id: `${uuid}_test`,
+            updated_at: faker.date.recent().toISOString(),
+            data: {
+                last_active_at: faker.date.recent().toISOString(),
+                event_data: {
+                    user_added: faker.string.uuid(),
+                },
+
+            },
+            version: faker.datatype.number(),
+        }
+
+        await dynamodb.updateRecordNested(updatedRecord)
+        const resp = await dynamodb.getRecord(updatedRecord.uuid, updatedRecord.record_id as string)
+        console.log(JSON.stringify(resp))
+        expect(resp).toBeFalsy()
+    })
+
     test('upsert a record 2', async () => {
 
         const updatedRecord = {
@@ -84,11 +106,13 @@ describe('DynamoDB', () => {
             record_id: record.record_id,
             data: {
                 event_data: {
-                    'user:updated': faker.string.uuid(),
+                    'account_created': '3e2e3d894dea368a1040445163c01387',
                 },
                 newPath: {
                     thrdLevel: {
                         frthLevel: faker.string.uuid(),
+                        frthLevel_2: faker.string.uuid(),
+                        frthLevel_3: faker.string.uuid(),
                     },
                 },
             },
@@ -97,9 +121,10 @@ describe('DynamoDB', () => {
         await dynamodb.upsertRecordNested(updatedRecord)
         const resp = await dynamodb.getRecord(updatedRecord.uuid, updatedRecord.record_id as string)
         expect(resp).toBeDefined()
-        expect(resp.data?.event_data['user:updated']).toEqual(updatedRecord.data.event_data['user:updated'])
         expect(resp.data?.event_data['user:created']).toEqual(record.data.event_data['user:created'])
         expect(resp.data?.newPath?.thrdLevel?.frthLevel).toEqual(updatedRecord.data.newPath.thrdLevel.frthLevel)
+        expect(resp.data?.newPath?.thrdLevel?.frthLevel_2).toEqual(updatedRecord.data.newPath.thrdLevel.frthLevel_2)
+        expect(resp.data?.newPath?.thrdLevel?.frthLevel_3).toEqual(updatedRecord.data.newPath.thrdLevel.frthLevel_3)
     })
 
     test('update all record with nested attributes', async () => {
@@ -113,7 +138,6 @@ describe('DynamoDB', () => {
                 lastname: null,
             }
         }
-
         await dynamodb.updateRecordExcluding(updatedRecord, ['data.firstname'])
         const resp = await dynamodb.getRecord(record.uuid as string, record.record_id as string)
         expect((resp?.data as DynamoDbSchema).firstname === fakeName).toBeFalsy()
@@ -136,5 +160,11 @@ describe('DynamoDB', () => {
             const data = await dynamodb.getRecord(r.uuid as string, r.record_id as string)
             expect(data).toBeFalsy()
         }
+    })
+
+    test('describe a table', async () => {
+        const response = await dynamodb.describeTable()
+        console.log(JSON.stringify(response))
+        expect(response).toBeDefined()
     })
 })

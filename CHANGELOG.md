@@ -1,5 +1,11 @@
 # @asalam/tynamo
 
+## 2.2.0
+
+### Minor Changes
+
+- adding describeTable method
+
 ## 2.1.0
 
 ### Minor Changes

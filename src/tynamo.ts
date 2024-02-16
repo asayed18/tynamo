@@ -2,9 +2,11 @@ import { DynamodbError } from '@_/errors/DynamodbError'
 import { convertToUnderscore } from '@_/helpers'
 import {
     BatchWriteItemCommand,
+    DescribeTableCommand,
     DynamoDBClient,
     DynamoDBClientConfig,
     GetItemCommand,
+    GetItemCommandInput,
     GetItemCommandOutput,
     PutItemCommand,
     PutItemCommandOutput,
@@ -140,6 +142,20 @@ export class Tynamo<PK extends string, SK extends string | undefined> {
     }
 
     /**
+     * Retrieves the description of the table.
+     * @returns {Promise<DescribeTableOutput>} The description of the table.
+     */
+    async describeTable() {
+        // return the table descirbe
+        return this.send(
+            new DescribeTableCommand({
+                TableName: this.tableName,
+            }),
+            'DescribeTable',
+        )
+    }
+
+    /**
      * Generates the keys for a DynamoDB record.
      * 
      * @param record - The DynamoDB record.
@@ -197,6 +213,15 @@ export class Tynamo<PK extends string, SK extends string | undefined> {
     }
 
     private async updateItem(params: UpdateItemCommandInput) {
+
+        if (params.ExpressionAttributeNames) {
+            params.ConditionExpression = `attribute_exists(#${this.pk})`
+            params.ExpressionAttributeNames[`#${this.pk}`] = this.pk
+            if (this.sk) {
+                params.ExpressionAttributeNames[`#${this.sk}`] = this.sk
+                params.ConditionExpression += ` and attribute_exists(#${this.sk})`
+            }
+        }
         const command = new UpdateItemCommand(params)
         return this.send(command, 'UpdateItemError') as Promise<UpdateItemCommandOutput>
     }
@@ -220,7 +245,7 @@ export class Tynamo<PK extends string, SK extends string | undefined> {
             record,
         })
         try {
-            const response = this.updateItem({
+            const response = await this.updateItem({
                 TableName: this.tableName,
                 Key: this.keys(record),
                 UpdateExpression,
@@ -234,7 +259,11 @@ export class Tynamo<PK extends string, SK extends string | undefined> {
             if (Tynamo.isNestedError(origErr)) {
                 const originalRecord = await this.getRecord(record[this.pk], this.sk && record[this.sk])
                 const mergedRecord = this.mergeRecords(record, originalRecord, true, [])
-                return this.updateItem(mergedRecord)
+                return this.putRecord(mergedRecord)
+            }
+            if (Tynamo.isUpdateError(origErr)) {
+                console.warn('Tynamo::UpdateError::RecordNotFound', pick(record, [this.pk, this.sk ?? '']))
+                return undefined
             }
             throw new DynamodbError(origErr)
         }
@@ -251,12 +280,6 @@ export class Tynamo<PK extends string, SK extends string | undefined> {
             include: true,
             record,
         })
-        let conditionalExpression = `attribute_exists(#${this.pk})`
-        ExpressionAttributeNames[`#${this.pk}`] = this.pk
-        if (this.sk) {
-            conditionalExpression += ` and attribute_exists(#${this.sk})`
-            ExpressionAttributeNames[`#${this.sk}`] = this.sk
-        }
 
         try {
             const resp = await this.updateItem({
@@ -264,14 +287,14 @@ export class Tynamo<PK extends string, SK extends string | undefined> {
                 Key: this.keys(record),
                 UpdateExpression,
                 ExpressionAttributeNames,
-                ConditionExpression: conditionalExpression,
                 ExpressionAttributeValues,
                 ReturnValuesOnConditionCheckFailure: 'ALL_OLD',
             })
             return resp
         } catch (error) {
             const origErr = error as unknown as DynamodbError
-            if (origErr.name === 'ConditionalCheckFailedException') {
+            console.warn(origErr.name, origErr.message)
+            if (Tynamo.isUpdateError(origErr)) {
                 console.warn('Tynamo::UpsertError::RecordNotFound::Inserting', pick(record, [this.pk, this.sk ?? '']))
                 return this.putRecord(record, { marshallOptions: options?.marshallOptions })
             }
@@ -378,6 +401,10 @@ export class Tynamo<PK extends string, SK extends string | undefined> {
                 const mergedRecord = this.mergeRecords(record, originalRecord, true, exclude)
                 return this.updateItem(mergedRecord)
             }
+            if (Tynamo.isUpdateError(origErr)) {
+                console.warn('Tynamo::UpdateError::RecordNotFound', pick(record, [this.pk, this.sk ?? '']))
+                return undefined
+            }
             throw error
         }
     }
@@ -419,6 +446,9 @@ export class Tynamo<PK extends string, SK extends string | undefined> {
                 const originalRecord = await this.getRecord(record[this.pk], this.sk && record[this.sk])
                 const mergedRecord = this.mergeRecords(record, originalRecord, include, [])
                 return this.updateItem(mergedRecord)
+            } if (Tynamo.isUpdateError(origErr)) {
+                console.warn('Tynamo::UpdateError::RecordNotFound', pick(record, [this.pk, this.sk ?? '']))
+                return undefined
             }
             throw error
         }
@@ -433,7 +463,14 @@ export class Tynamo<PK extends string, SK extends string | undefined> {
 
     static isNestedError(err: Error): boolean {
         return err.name === 'ValidationException' &&
-            err.message.includes('path provided in the update expression is invalid for update')
+            (
+                err.message.includes('path provided in the update expression is invalid for update') ||
+                err.message.includes('Invalid UpdateExpression')
+            )
+    }
+
+    static isUpdateError(err: Error): boolean {
+        return err.name === 'ConditionalCheckFailedException'
     }
 
     /**
