@@ -1,5 +1,11 @@
 # @asalam/tynamo
 
+## 2.3.0
+
+### Minor Changes
+
+- 'fix marshallOptions in updateRecordNested'
+
 ## 2.2.0
 
 ### Minor Changes
