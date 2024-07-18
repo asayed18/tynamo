@@ -257,9 +257,13 @@ export class Tynamo<PK extends string, SK extends string | undefined> {
         catch (error) {
             const origErr = error as unknown as Error
             if (Tynamo.isNestedError(origErr)) {
+                console.warn(
+                    'Tynamo::UpdateNestedError::UnMatchedSchema::FetchingOriginalRecord',
+                    pick(record, [this.pk, this.sk ?? '']),
+                )
                 const originalRecord = await this.getRecord(record[this.pk], this.sk && record[this.sk])
                 const mergedRecord = this.mergeRecords(record, originalRecord, true, [])
-                return this.putRecord(mergedRecord)
+                return this.putRecord(mergedRecord, { marshallOptions: options?.marshallOptions })
             }
             if (Tynamo.isUpdateError(origErr)) {
                 console.warn('Tynamo::UpdateError::RecordNotFound', pick(record, [this.pk, this.sk ?? '']))
@@ -300,7 +304,7 @@ export class Tynamo<PK extends string, SK extends string | undefined> {
             }
             if (Tynamo.isNestedError(origErr)) {
                 console.warn(
-                    'Tynamo::UpdateNestedError::UnMatchedSchema::FetchingOriginalRecord',
+                    'Tynamo::UpsertNestedError::UnMatchedSchema::FetchingOriginalRecord',
                     pick(record, [this.pk, this.sk ?? '']),
                 )
                 const originalRecord = await this.getRecord(record[this.pk], this.sk && record[this.sk])
