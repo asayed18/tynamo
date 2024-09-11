@@ -21,56 +21,69 @@ npm install @asalam/taynmo
 
 Before you can start using the library, you need to configure it with your DynamoDB settings. Here's an example:
 
-```javascript
-const { Tynamo } = require('@asalam/taynmo');
+```ts
+const { Tynamo } = require('@asalam/taynmo')
 
 const dynamodb = Tynamo.create('your-table-name', 'your-primary-key', 'your-sort-key', {
-    region: 'your-region',
-    endpoint: 'your-endpoint', // Optional for local development
-    credentials: {
-        accessKeyId: 'your-access-key-id',
-        secretAccessKey: 'your-secret-access-key',
-    },
-});
+  logLevel: 'ERROR',
+  region: 'your-region',
+  endpoint: 'your-endpoint', // Optional for local development
+  credentials: {
+    accessKeyId: 'your-access-key-id',
+    secretAccessKey: 'your-secret-access-key',
+  },
+})
 ```
 
-If you have only primary key without composite key you can use 
+If you have only primary key without composite key you can use
 
-```javascript
-const dynamodb = Tynamo.createOnlyPk('your-table-name', 'your-primary-key');
+```ts
+const dynamodb = Tynamo.createOnlyPk('your-table-name', 'your-primary-key')
 ```
 
 ## Usage
 
 ### Creating a Record
 
-```javascript
-const record = { /* your record data */ };
-await dynamodb.putRecord(record);
+```ts
+const record = {
+  /* your record data */
+}
+await dynamodb.putRecord(record)
 ```
 
 ### Updating a Record
 
-```javascript
-const updatedRecord = { /* your updated record data */ };
+```ts
+const updatedRecord = {
+  /* your updated record data */
+}
 // Update specific fields inside a record
-await dynamodb.updateRecordIncluding(updatedRecord, ['path.to.attribute']);
+await dynamodb.updateRecordIncluding(updatedRecord, ['path.to.attribute'])
 
 // Update all fields inside a record except for specific attributes
-await dynamodb.updateRecordExcluding(record, ['path.to.attribute']);
+await dynamodb.updateRecordExcluding(record, ['path.to.attribute'])
 ```
 
 ### Upserting a Record
 
-```javascript
-const upsertRecord = { /* your record data for upsert */ };
-await dynamodb.upsertRecordNested(upsertRecord);
+```ts
+const upsertRecord = {
+  /* your record data for upsert */
+}
+await dynamodb.upsertRecordNested(upsertRecord)
 ```
 
 ### Querying a Record
 
-```javascript
-const resp = await dynamodb.getRecord('your-record-uuid', 'your-record-id');
+```ts
+const resp = await dynamodb.getRecord('<pk>', '<sk>')
+```
+
+### Querying records
+
+```ts
+const records = await dynamodb.batchGetRecord([{pk:<pk>, sk:<sk>}, ...]);
 ```
 
 ## Contributing
