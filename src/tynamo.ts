@@ -1,12 +1,14 @@
 import { DynamodbError } from '@_/errors/DynamodbError'
 import { convertToUnderscore } from '@_/helpers'
+import { Logger, LogLevel, LogName } from '@_/logger'
 import {
+    BatchGetItemCommand,
+    BatchGetItemCommandOutput,
     BatchWriteItemCommand,
     DescribeTableCommand,
     DynamoDBClient,
     DynamoDBClientConfig,
     GetItemCommand,
-    GetItemCommandInput,
     GetItemCommandOutput,
     PutItemCommand,
     PutItemCommandOutput,
@@ -21,10 +23,22 @@ import { merge, omit, pick } from 'lodash'
 import { CompositeKeySchema, DynamoDbSchema } from './DynamoDbSchema'
 
 /**
+ * Options for configuring the Tynamo client.
+ */
+interface TynamoOptions extends DynamoDBClientConfig {
+    /**
+     * The log level for logging. Default is 'INFO'.
+     */
+    logLevel?: LogName
+}
+
+/**
  * Represents a DynamoDB client for interacting with a DynamoDB table.
  */
 export class Tynamo<PK extends string, SK extends string | undefined> {
-    public client: DynamoDBClient
+    private client: DynamoDBClient
+
+    private logger: Logger
 
     tableName: string
 
@@ -43,7 +57,7 @@ export class Tynamo<PK extends string, SK extends string | undefined> {
         tableName: string,
         pk: PK,
         sk?: SK,
-        options?: DynamoDBClientConfig) {
+        options?: TynamoOptions) {
         this.client = new DynamoDBClient(options || {
             requestHandler: new NodeHttpHandler({
                 requestTimeout: 1000,
@@ -52,6 +66,11 @@ export class Tynamo<PK extends string, SK extends string | undefined> {
             maxAttempts: 6,
             retryMode: 'adaptive',
         })
+        if (options?.logLevel) {
+            this.logger = new Logger(options.logLevel)
+        } else {
+            this.logger = new Logger('INFO')
+        }
         this.tableName = tableName
         this.pk = pk
         this.sk = sk
@@ -67,7 +86,7 @@ export class Tynamo<PK extends string, SK extends string | undefined> {
      * @param options - The configuration options for the DynamoDB client (optional).
      * @returns A new instance of the DynamoDB class.
      */
-    static create<A extends string, B extends string>(tableName: string, pk: A, sk: B, options?: DynamoDBClientConfig) {
+    static create<A extends string, B extends string>(tableName: string, pk: A, sk: B, options?: TynamoOptions) {
         return new Tynamo<A, B>(tableName, pk, sk, options)
     }
 
@@ -80,7 +99,7 @@ export class Tynamo<PK extends string, SK extends string | undefined> {
      * @param options - The configuration options for the DynamoDB client (optional).
      * @returns A new instance of the DynamoDB class.
      */
-    static createOnlyPk<A extends string>(tableName: string, pk: A, options?: DynamoDBClientConfig) {
+    static createOnlyPk<A extends string>(tableName: string, pk: A, options?: TynamoOptions) {
         return new Tynamo<A, undefined>(tableName, pk, undefined, options)
     }
 
@@ -174,8 +193,8 @@ export class Tynamo<PK extends string, SK extends string | undefined> {
     async batchWriteRecord(records: CompositeKeySchema<PK, SK>[], options?: { marshallOptions?: marshallOptions }) {
         // distribute records into chunks of 25
         const chunks = []
-        while (records.length > 0) {
-            chunks.push(records.splice(0, 25))
+        for (let i = 0; i < records.length; i += 25) {
+            chunks.push(records.slice(i, i + 25))
         }
         const promises = chunks.map(chunk => this.send(new BatchWriteItemCommand({
             RequestItems: {
@@ -189,6 +208,29 @@ export class Tynamo<PK extends string, SK extends string | undefined> {
         return Promise.all(promises)
     }
 
+    async batchGetRecord(records: CompositeKeySchema<PK, SK>[]): Promise<CompositeKeySchema<PK, SK>[]> {
+        const chunks = []
+        if (records.length === 0) return []
+        for (let i = 0; i < records.length; i += 25) {
+            chunks.push(records.slice(i, i + 25))
+        }
+        const promises = chunks.map(chunk => this.send(new BatchGetItemCommand({
+            RequestItems: {
+                [this.tableName]: { Keys: chunk.map(p => this.keys(p)) },
+            },
+        }), 'BatchGetRecord')) as Promise<BatchGetItemCommandOutput>[]
+        const responses = await Promise.all(promises)
+        const results: Record<string, unknown>[] = []
+        for (const response of responses) {
+            results.push(
+                ...(response.Responses ?
+                    response.Responses[this.tableName]?.map(item => unmarshall(item)) || [] :
+                    []),
+            )
+        }
+        return results
+    }
+
     /**
      * Deletes multiple records from the DynamoDB table using batch write operation.
      * @param records - An array of composite key schemas representing the records to be deleted.
@@ -196,8 +238,8 @@ export class Tynamo<PK extends string, SK extends string | undefined> {
      */
     async batchDeleteRecord(records: CompositeKeySchema<PK, SK>[]) {
         const chunks = []
-        while (records.length > 0) {
-            chunks.push(records.splice(0, 25))
+        for (let i = 0; i < records.length; i += 25) {
+            chunks.push(records.slice(i, i + 25))
         }
         const promises = chunks.map(chunk => this.send(new BatchWriteItemCommand({
             RequestItems: {
@@ -257,7 +299,8 @@ export class Tynamo<PK extends string, SK extends string | undefined> {
         catch (error) {
             const origErr = error as unknown as Error
             if (Tynamo.isNestedError(origErr)) {
-                console.warn(
+                this.logger.log(
+                    LogLevel.WARN,
                     'Tynamo::UpdateNestedError::UnMatchedSchema::FetchingOriginalRecord',
                     pick(record, [this.pk, this.sk ?? '']),
                 )
@@ -266,7 +309,11 @@ export class Tynamo<PK extends string, SK extends string | undefined> {
                 return this.putRecord(mergedRecord, { marshallOptions: options?.marshallOptions })
             }
             if (Tynamo.isUpdateError(origErr)) {
-                console.warn('Tynamo::UpdateError::RecordNotFound', pick(record, [this.pk, this.sk ?? '']))
+                this.logger.log(
+                    LogLevel.WARN,
+                    'Tynamo::UpdateError::RecordNotFound',
+                    pick(record, [this.pk, this.sk ?? '']),
+                )
                 return undefined
             }
             throw new DynamodbError(origErr)
@@ -297,13 +344,17 @@ export class Tynamo<PK extends string, SK extends string | undefined> {
             return resp
         } catch (error) {
             const origErr = error as unknown as DynamodbError
-            console.warn(origErr.name, origErr.message)
+            this.logger.log(LogLevel.WARN, origErr.name, origErr.message)
             if (Tynamo.isUpdateError(origErr)) {
-                console.warn('Tynamo::UpsertError::RecordNotFound::Inserting', pick(record, [this.pk, this.sk ?? '']))
+                this.logger.log(
+                    LogLevel.WARN,
+                    'Tynamo::UpsertError::RecordNotFound::Inserting', pick(record, [this.pk, this.sk ?? '']),
+                )
                 return this.putRecord(record, { marshallOptions: options?.marshallOptions })
             }
             if (Tynamo.isNestedError(origErr)) {
-                console.warn(
+                this.logger.log(
+                    LogLevel.WARN,
                     'Tynamo::UpsertNestedError::UnMatchedSchema::FetchingOriginalRecord',
                     pick(record, [this.pk, this.sk ?? '']),
                 )
@@ -347,15 +398,20 @@ export class Tynamo<PK extends string, SK extends string | undefined> {
                 ExpressionAttributeValues,
                 ReturnValuesOnConditionCheckFailure: 'ALL_OLD',
             })
+            this.logger.log(LogLevel.INFO, 'Tynamo::UpsertRecordIncluding', resp)
             return resp
         } catch (error) {
             const origErr = error as unknown as DynamodbError
             if (origErr.name === 'ConditionalCheckFailedException') {
-                console.warn('Tynamo::UpsertError::RecordNotFound::Inserting', pick(record, [this.pk, this.sk ?? '']))
+                this.logger.log(
+                    LogLevel.WARN,
+                    'Tynamo::UpsertError::RecordNotFound::Inserting', pick(record, [this.pk, this.sk ?? '']),
+                )
                 return this.putRecord(record, { marshallOptions: options?.marshallOptions })
             }
             if (Tynamo.isNestedError(origErr)) {
-                console.warn(
+                this.logger.log(
+                    LogLevel.WARN,
                     'Tynamo::UpdateNestedError::UnMatchedSchema::FetchingOriginalRecord',
                     pick(record, [this.pk, this.sk ?? '']),
                 )
@@ -397,6 +453,7 @@ export class Tynamo<PK extends string, SK extends string | undefined> {
                 ExpressionAttributeNames,
                 ExpressionAttributeValues,
             })
+            this.logger.log(LogLevel.INFO, 'Tynamo::UpdateRecordExcluding', pick(record, [this.pk, this.sk ?? '']))
             return resp
         } catch (error) {
             const origErr = error as unknown as DynamodbError
@@ -406,7 +463,9 @@ export class Tynamo<PK extends string, SK extends string | undefined> {
                 return this.updateItem(mergedRecord)
             }
             if (Tynamo.isUpdateError(origErr)) {
-                console.warn('Tynamo::UpdateError::RecordNotFound', pick(record, [this.pk, this.sk ?? '']))
+                this.logger.log(
+                    LogLevel.WARN,
+                    'Tynamo::UpdateError::RecordNotFound', pick(record, [this.pk, this.sk ?? '']))
                 return undefined
             }
             throw error
@@ -437,13 +496,15 @@ export class Tynamo<PK extends string, SK extends string | undefined> {
             exclude: [],
         })
         try {
-            return this.updateItem({
+            const resp = this.updateItem({
                 TableName: this.tableName,
                 Key: this.keys(record),
                 UpdateExpression,
                 ExpressionAttributeNames,
                 ExpressionAttributeValues,
             })
+            this.logger.log(LogLevel.INFO, 'Tynamo::UpdateRecordIncluding', resp)
+            return resp
         } catch (error) {
             const origErr = error as unknown as DynamodbError
             if (Tynamo.isNestedError(origErr)) {
@@ -451,7 +512,10 @@ export class Tynamo<PK extends string, SK extends string | undefined> {
                 const mergedRecord = this.mergeRecords(record, originalRecord, include, [])
                 return this.updateItem(mergedRecord)
             } if (Tynamo.isUpdateError(origErr)) {
-                console.warn('Tynamo::UpdateError::RecordNotFound', pick(record, [this.pk, this.sk ?? '']))
+                this.logger.log(
+                    LogLevel.WARN,
+                    'Tynamo::UpdateError::RecordNotFound', pick(record, [this.pk, this.sk ?? '']),
+                )
                 return undefined
             }
             throw error

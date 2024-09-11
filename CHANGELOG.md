@@ -1,5 +1,12 @@
 # @asalam/tynamo
 
+## 2.4.0
+
+### Minor Changes
+
+- Adding "batchGetRecord" for mapping "BatchGetItem"
+- Adding "logLevel" option for controlling log level in Tynamo
+
 ## 2.3.0
 
 ### Minor Changes

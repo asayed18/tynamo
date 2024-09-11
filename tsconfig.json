@@ -1,6 +1,10 @@
 {
     "compileOnSave": false,
     "compilerOptions": {
+        "types": [
+            "node",
+            "jest"
+        ],
         "allowSyntheticDefaultImports": true,
         "declaration": true,
         "declarationMap": false,
@@ -42,9 +46,6 @@
     ],
     "exclude": [
         "node_modules",
-        "dist",
-        "src/tests",
-        "src/**/*.test.ts",
-        "src/**/*.spec.ts"
+        "dist"
     ]
 }

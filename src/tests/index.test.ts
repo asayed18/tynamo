@@ -2,7 +2,7 @@
 import { DynamoDbSchema } from '@_/DynamoDbSchema'
 import { Tynamo } from '@_/tynamo'
 // eslint-disable-next-line import/no-extraneous-dependencies
-import { fa, faker } from '@faker-js/faker'
+import { faker } from '@faker-js/faker'
 
 import { DynamodbRecordFactory } from './factories/dynamodbRecordFactory'
 
@@ -13,6 +13,7 @@ import { DynamodbRecordFactory } from './factories/dynamodbRecordFactory'
 describe('DynamoDB', () => {
     const record = DynamodbRecordFactory.create()
     const dynamodb = Tynamo.create('datalake', 'uuid', 'record_id', {
+        logLevel: 'DEBUG',
         region: 'us-east-1',
         endpoint: 'http://localhost:8000',
         credentials: {
@@ -66,12 +67,12 @@ describe('DynamoDB', () => {
                 },
 
             },
-            version: faker.datatype.number(),
+            version: faker.number.int(),
         }
 
         await dynamodb.updateRecordNested(updatedRecord)
         const resp = await dynamodb.getRecord(updatedRecord.uuid, updatedRecord.record_id as string)
-        console.log(JSON.stringify(resp))
+        console.debug(JSON.stringify(resp))
         expect(resp).toBeFalsy()
     })
 
@@ -162,9 +163,19 @@ describe('DynamoDB', () => {
         }
     })
 
+    test('batch get records', async () => {
+        const records = Array(100).fill(0).map(_ => DynamodbRecordFactory.create())
+        await dynamodb.batchWriteRecord(records)
+        const result = await dynamodb.batchGetRecord(
+            records.map(r => ({ uuid: r.uuid, record_id: r.record_id })),
+        )
+        expect(result).toBeDefined()
+        expect(result.length).toBe(100)
+    })
+
     test('describe a table', async () => {
         const response = await dynamodb.describeTable()
-        console.log(JSON.stringify(response))
+        console.debug(JSON.stringify(response))
         expect(response).toBeDefined()
     })
 })

@@ -7,8 +7,8 @@ const moduleNameMapper = compilerOptions.paths
   : {}
 module.exports = {
   displayName: 'tsdynamo',
-  ...tsPreset,
   preset: '@shelf/jest-dynamodb',
+  ...tsPreset,
   testEnvironment: 'node',
   setupFiles: ['./jest.setup.js'],
   moduleFileExtensions: ['ts', 'js', 'html'],
