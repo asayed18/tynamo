@@ -1,5 +1,11 @@
 # @asalam/tynamo
 
+## 2.4.1
+
+### Patch Changes
+
+- 03da382: Update Documentation
+
 ## 2.4.0
 
 ### Minor Changes
