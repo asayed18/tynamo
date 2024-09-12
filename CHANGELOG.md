@@ -1,5 +1,11 @@
 # @asalam/tynamo
 
+## 2.4.2
+
+### Patch Changes
+
+- 41c5a48: Using changeset for publishing
+
 ## 2.4.1
 
 ### Patch Changes
