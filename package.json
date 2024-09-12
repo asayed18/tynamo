@@ -9,7 +9,7 @@
   "license": "MIT",
   "scripts": {
     "build": "tsup ./src/index.ts --format cjs,esm --dts-resolve",
-    "release": "changeset version; changeset publish",
+    "release": "npm run build; changeset version; changeset publish",
     "lint": "tsc",
     "test": "jest --coverage --coverageReporters=text-summary --verbose --runInBand --forceExit --detectOpenHandles --testTimeout=10000",
     "prepare": "husky"
