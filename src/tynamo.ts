@@ -2,6 +2,7 @@ import { DynamodbError } from '@_/errors/DynamodbError'
 import { convertToUnderscore } from '@_/helpers'
 import { Logger, LogLevel, LogName } from '@_/logger'
 import {
+    AttributeValue,
     BatchGetItemCommand,
     BatchGetItemCommandOutput,
     BatchWriteItemCommand,
@@ -12,6 +13,7 @@ import {
     GetItemCommandOutput,
     PutItemCommand,
     PutItemCommandOutput,
+    ReturnValuesOnConditionCheckFailure,
     UpdateItemCommand,
     UpdateItemCommandInput,
     UpdateItemCommandOutput,
@@ -211,8 +213,8 @@ export class Tynamo<PK extends string, SK extends string | undefined> {
     async batchGetRecord(records: CompositeKeySchema<PK, SK>[]): Promise<CompositeKeySchema<PK, SK>[]> {
         const chunks = []
         if (records.length === 0) return []
-        for (let i = 0; i < records.length; i += 25) {
-            chunks.push(records.slice(i, i + 25))
+        for (let i = 0; i < records.length; i += 100) {
+            chunks.push(records.slice(i, i + 100))
         }
         const promises = chunks.map(chunk => this.send(new BatchGetItemCommand({
             RequestItems: {
@@ -254,10 +256,11 @@ export class Tynamo<PK extends string, SK extends string | undefined> {
         return Promise.all(promises)
     }
 
-    private async updateItem(params: UpdateItemCommandInput) {
+    private async updateItem(params: UpdateItemCommandInput, insert = false) {
 
         if (params.ExpressionAttributeNames) {
-            params.ConditionExpression = `attribute_exists(#${this.pk})`
+            // eslint-disable-next-line max-len
+            params.ConditionExpression = `${params.ConditionExpression ? `${params.ConditionExpression} and ` : ''}attribute_exists(#${this.pk})`
             params.ExpressionAttributeNames[`#${this.pk}`] = this.pk
             if (this.sk) {
                 params.ExpressionAttributeNames[`#${this.sk}`] = this.sk
@@ -275,7 +278,11 @@ export class Tynamo<PK extends string, SK extends string | undefined> {
      * @param {T} record - The record to update.
      * @returns {Promise<void>} - A promise that resolves when the update is complete.
      */
-    async updateRecordNested(record: CompositeKeySchema<PK, SK>, options?: { marshallOptions?: marshallOptions }) {
+    async updateRecordNested(record: CompositeKeySchema<PK, SK>, options?: {
+        marshallOptions?: marshallOptions,
+        conditionExpression?: string,
+        expressionAttributeValues?: Record<string, AttributeValue>,
+    }) {
         const {
             UpdateExpression,
             ExpressionAttributeNames,
@@ -286,14 +293,25 @@ export class Tynamo<PK extends string, SK extends string | undefined> {
             include: true,
             record,
         })
+
         try {
-            const response = await this.updateItem({
+            const params = {
                 TableName: this.tableName,
                 Key: this.keys(record),
                 UpdateExpression,
                 ExpressionAttributeNames,
                 ExpressionAttributeValues,
-            })
+                ConditionExpression: options?.conditionExpression,
+            }
+            if (options?.conditionExpression) {
+                const { attributeNames, attributeValues } = Tynamo.parseExpression(
+                    options.conditionExpression,
+                    options.expressionAttributeValues,
+                )
+                params.ExpressionAttributeNames = { ...params.ExpressionAttributeNames, ...attributeNames }
+                params.ExpressionAttributeValues = { ...params.ExpressionAttributeValues, ...attributeValues }
+            }
+            const response = await this.updateItem(params)
             return response
         }
         catch (error) {
@@ -320,7 +338,11 @@ export class Tynamo<PK extends string, SK extends string | undefined> {
         }
     }
 
-    async upsertRecordNested(record: CompositeKeySchema<PK, SK>, options?: { marshallOptions?: marshallOptions }) {
+    async upsertRecordNested(record: CompositeKeySchema<PK, SK>, options?: {
+        marshallOptions?: marshallOptions,
+        conditionExpression?: string,
+        expressionAttributeValues?: Record<string, AttributeValue>,
+    }) {
         const {
             UpdateExpression,
             ExpressionAttributeNames,
@@ -333,18 +355,27 @@ export class Tynamo<PK extends string, SK extends string | undefined> {
         })
 
         try {
-            const resp = await this.updateItem({
+            const params: UpdateItemCommandInput = {
                 TableName: this.tableName,
                 Key: this.keys(record),
                 UpdateExpression,
                 ExpressionAttributeNames,
                 ExpressionAttributeValues,
-                ReturnValuesOnConditionCheckFailure: 'ALL_OLD',
-            })
+                ReturnValuesOnConditionCheckFailure: ReturnValuesOnConditionCheckFailure.ALL_OLD,
+            }
+            if (options?.conditionExpression) {
+                const { attributeNames, attributeValues } = Tynamo.parseExpression(
+                    options.conditionExpression,
+                    options.expressionAttributeValues,
+                )
+                params.ConditionExpression = options.conditionExpression
+                params.ExpressionAttributeNames = { ...params.ExpressionAttributeNames, ...attributeNames }
+                params.ExpressionAttributeValues = { ...params.ExpressionAttributeValues, ...attributeValues }
+            }
+            const resp = await this.updateItem(params, true)
             return resp
         } catch (error) {
             const origErr = error as unknown as DynamodbError
-            this.logger.log(LogLevel.WARN, origErr.name, origErr.message)
             if (Tynamo.isUpdateError(origErr)) {
                 this.logger.log(
                     LogLevel.WARN,
@@ -359,6 +390,7 @@ export class Tynamo<PK extends string, SK extends string | undefined> {
                     pick(record, [this.pk, this.sk ?? '']),
                 )
                 const originalRecord = await this.getRecord(record[this.pk], this.sk && record[this.sk])
+                console.log(originalRecord)
                 const mergedRecord = this.mergeRecords(record, originalRecord, true, [])
                 return this.putRecord(mergedRecord, { marshallOptions: options?.marshallOptions })
             }
@@ -542,6 +574,84 @@ export class Tynamo<PK extends string, SK extends string | undefined> {
     }
 
     /**
+     * a helper function to parse dynamodb expression and extract the name and value
+     * 
+     * Expression variable should start with '#' and expression value should start with ':'
+     * @param expr dynamodb expression like ConditionExpression, FilterExpression, etc.
+     * 
+     * @example
+     * ```ts
+     * import { Tynamo } from '@_/tynamo'
+     * import { AttributeValue } from '@aws-sdk/client-dynamodb'
+     * const start = new Date().getTime();
+     * let res = Tynamo.parseExpression(
+     *  '#name = :name and #data.#value.#sub_val = :value and size   (#users ) > :size and begins_with(#aaa, :dd)',
+     * {
+     *      ':name': {S: 'Ahmed'},
+     *      ':value': { S: 'Ahmed'},
+     *      ':size': {N: '10'},
+     *      ':dd': {S: 'Ahmed'},
+     * }
+     * )
+     * let elapsed = new Date().getTime() - start;
+     * console.log(`Elapsed Time: ${elapsed} milliseconds`)
+     * console.log(`Result: `,res) 
+     * expect(res.attributeNames['#data']).toBe('data')
+     * expect(res.attributeNames['#value']).toBe('value')
+     * expect(res.attributeNames['#sub_val']).toBe('sub_val')
+     * expect(res.attributeNames['#users']).toBe('users')
+     * ```
+     */
+    static parseExpression(expr: string, attributeValues?: Record<string, AttributeValue>): {
+        attributeNames: Record<string, string>,
+        attributeValues: Record<string, AttributeValue>
+    } {
+        const result: {
+            attributeNames: Record<string, string>,
+            attributeValues: Record<string, AttributeValue>
+        } = {
+            attributeNames: {},
+            attributeValues: {},
+        }
+
+        const sAttributeName = '(?<attributeName>(#\\w+(\\.#\\w+)*))'
+        const sAttributeValue = '(:(?<attributeValue>\\w+))'
+        const regexes = [
+            RegExp(`${sAttributeName}\\s*(=|>|<|>=|<=|<>)\\s*${sAttributeValue}`, 'g'),
+            RegExp(`size\\s*\\(\\s*${sAttributeName}\\s*\\)\\s*(=|>|<|>=|<=|<>)\\s*${sAttributeValue}`, 'g'),
+            // eslint-disable-next-line max-len
+            RegExp(`(begins_with|attribute_exists|attribute_not_exists|attribute_type|contains)\\s*\\(\\s*${sAttributeName}\\s*(,(\\s*${sAttributeValue}\\s*))?\\)`, 'g'),
+        ]
+
+        for (const regex of regexes) {
+            const matches = expr.matchAll(regex)
+            for (const match of matches) {
+
+                const { attributeName, attributeValue } = match.groups || {}
+                if (attributeName) {
+                    const attributeNameParts = [...attributeName.matchAll(/\w+/g)]
+                    for (const part of attributeNameParts) {
+                        // eslint-disable-next-line prefer-destructuring
+                        result.attributeNames[`#${part[0]}`] = part[0]
+                    }
+                }
+                if (attributeValue) {
+                    if (attributeValues && attributeValues[`:${attributeValue}`]) {
+                        const key = `:${attributeValue}` as string
+                        result.attributeValues[key] = attributeValues[key] as AttributeValue
+                    }
+                    else {
+                        throw new DynamodbError(
+                            new Error(`\n":${attributeValue}" value not found in expression 👇\n"${expr}"\n`),
+                        )
+                    }
+                }
+            }
+        }
+        return result
+    }
+
+    /**
      * Generates an update expression, expression attribute names, and expression attribute values
      * for updating a DynamoDB record.
      * 
@@ -595,12 +705,17 @@ export class Tynamo<PK extends string, SK extends string | undefined> {
         traverseAttributes(record)
 
         const updateExpression = `SET ${updateExpressions.join(', ')}`
-
-        return {
+        const result = {
             UpdateExpression: updateExpression,
             ExpressionAttributeNames: expressionAttributeNames,
             ExpressionAttributeValues: marshall(expressionAttributeValues, _marshallOptions),
         }
+        this.logger.log(
+            LogLevel.DEBUG,
+            'Tynamo::generateUpdateExpression',
+            result,
+        )
+        return result
     }
 
     /**

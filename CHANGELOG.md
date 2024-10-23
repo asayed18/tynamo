@@ -1,5 +1,11 @@
 # @asalam/tynamo
 
+## 2.5.0
+
+### Minor Changes
+
+- Add conditional expression for update records
+
 ## 2.4.2
 
 ### Patch Changes
