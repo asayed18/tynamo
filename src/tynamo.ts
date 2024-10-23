@@ -6,6 +6,7 @@ import {
     BatchGetItemCommand,
     BatchGetItemCommandOutput,
     BatchWriteItemCommand,
+    ConditionalCheckFailedException,
     DescribeTableCommand,
     DynamoDBClient,
     DynamoDBClientConfig,
@@ -315,8 +316,8 @@ export class Tynamo<PK extends string, SK extends string | undefined> {
             return response
         }
         catch (error) {
-            const origErr = error as unknown as Error
-            if (Tynamo.isNestedError(origErr)) {
+            const origErr = (error as DynamodbError)?.original as Error
+            if (Tynamo.isUpdateError(origErr)) {
                 this.logger.log(
                     LogLevel.WARN,
                     'Tynamo::UpdateNestedError::UnMatchedSchema::FetchingOriginalRecord',
@@ -326,10 +327,10 @@ export class Tynamo<PK extends string, SK extends string | undefined> {
                 const mergedRecord = this.mergeRecords(record, originalRecord, true, [])
                 return this.putRecord(mergedRecord, { marshallOptions: options?.marshallOptions })
             }
-            if (Tynamo.isUpdateError(origErr)) {
+            if (Tynamo.isCheckError(origErr)) {
                 this.logger.log(
                     LogLevel.WARN,
-                    'Tynamo::UpdateError::RecordNotFound',
+                    'Tynamo::ConditionCheck::Failed',
                     pick(record, [this.pk, this.sk ?? '']),
                 )
                 return undefined
@@ -376,14 +377,24 @@ export class Tynamo<PK extends string, SK extends string | undefined> {
             return resp
         } catch (error) {
             const origErr = error as unknown as DynamodbError
-            if (Tynamo.isUpdateError(origErr)) {
-                this.logger.log(
-                    LogLevel.WARN,
-                    'Tynamo::UpsertError::RecordNotFound::Inserting', pick(record, [this.pk, this.sk ?? '']),
-                )
-                return this.putRecord(record, { marshallOptions: options?.marshallOptions })
+            if (Tynamo.isCheckError(origErr)) {
+                const oldRecord = (origErr.original as ConditionalCheckFailedException)?.Item
+                if (oldRecord && options?.conditionExpression) {
+                    this.logger.log(
+                        LogLevel.WARN,
+                        'Tynamo::ConditionCheck::Failed', pick(record, [this.pk, this.sk ?? '']),
+                    )
+                    return undefined
+                }
+                if (!oldRecord) {
+                    this.logger.log(
+                        LogLevel.WARN,
+                        'Tynamo::ConditionCheck::RecordNotFound::Inserting', pick(record, [this.pk, this.sk ?? '']),
+                    )
+                    return this.putRecord(record, { marshallOptions: options?.marshallOptions })
+                }
             }
-            if (Tynamo.isNestedError(origErr)) {
+            if (Tynamo.isUpdateError(origErr)) {
                 this.logger.log(
                     LogLevel.WARN,
                     'Tynamo::UpsertNestedError::UnMatchedSchema::FetchingOriginalRecord',
@@ -434,14 +445,14 @@ export class Tynamo<PK extends string, SK extends string | undefined> {
             return resp
         } catch (error) {
             const origErr = error as unknown as DynamodbError
-            if (origErr.name === 'ConditionalCheckFailedException') {
+            if (Tynamo.isCheckError(origErr)) {
                 this.logger.log(
                     LogLevel.WARN,
                     'Tynamo::UpsertError::RecordNotFound::Inserting', pick(record, [this.pk, this.sk ?? '']),
                 )
                 return this.putRecord(record, { marshallOptions: options?.marshallOptions })
             }
-            if (Tynamo.isNestedError(origErr)) {
+            if (Tynamo.isUpdateError(origErr)) {
                 this.logger.log(
                     LogLevel.WARN,
                     'Tynamo::UpdateNestedError::UnMatchedSchema::FetchingOriginalRecord',
@@ -489,12 +500,12 @@ export class Tynamo<PK extends string, SK extends string | undefined> {
             return resp
         } catch (error) {
             const origErr = error as unknown as DynamodbError
-            if (Tynamo.isNestedError(origErr)) {
+            if (Tynamo.isUpdateError(origErr)) {
                 const originalRecord = await this.getRecord(record[this.pk], this.sk && record[this.sk])
                 const mergedRecord = this.mergeRecords(record, originalRecord, true, exclude)
                 return this.updateItem(mergedRecord)
             }
-            if (Tynamo.isUpdateError(origErr)) {
+            if (Tynamo.isCheckError(origErr)) {
                 this.logger.log(
                     LogLevel.WARN,
                     'Tynamo::UpdateError::RecordNotFound', pick(record, [this.pk, this.sk ?? '']))
@@ -539,11 +550,11 @@ export class Tynamo<PK extends string, SK extends string | undefined> {
             return resp
         } catch (error) {
             const origErr = error as unknown as DynamodbError
-            if (Tynamo.isNestedError(origErr)) {
+            if (Tynamo.isUpdateError(origErr)) {
                 const originalRecord = await this.getRecord(record[this.pk], this.sk && record[this.sk])
                 const mergedRecord = this.mergeRecords(record, originalRecord, include, [])
                 return this.updateItem(mergedRecord)
-            } if (Tynamo.isUpdateError(origErr)) {
+            } if (Tynamo.isCheckError(origErr)) {
                 this.logger.log(
                     LogLevel.WARN,
                     'Tynamo::UpdateError::RecordNotFound', pick(record, [this.pk, this.sk ?? '']),
@@ -561,7 +572,7 @@ export class Tynamo<PK extends string, SK extends string | undefined> {
         return false
     }
 
-    static isNestedError(err: Error): boolean {
+    static isUpdateError(err: Error): boolean {
         return err.name === 'ValidationException' &&
             (
                 err.message.includes('path provided in the update expression is invalid for update') ||
@@ -569,7 +580,8 @@ export class Tynamo<PK extends string, SK extends string | undefined> {
             )
     }
 
-    static isUpdateError(err: Error): boolean {
+
+    static isCheckError(err: Error): err is ConditionalCheckFailedException {
         return err.name === 'ConditionalCheckFailedException'
     }
 

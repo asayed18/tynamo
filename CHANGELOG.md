@@ -1,5 +1,11 @@
 # @asalam/tynamo
 
+## 2.6.0
+
+### Minor Changes
+
+- Conditional Check to either upsert or not
+
 ## 2.5.0
 
 ### Minor Changes

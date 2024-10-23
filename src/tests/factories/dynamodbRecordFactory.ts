@@ -12,6 +12,7 @@ export class DynamodbRecordFactory {
                 uuid,
                 city: null,
                 country: null,
+                active_at: '2023-10-01',
                 country_alpha3: faker.location.countryCode('alpha-3'),
                 created_at: faker.date.past().toISOString(),
                 displayname: faker.internet.userName(),

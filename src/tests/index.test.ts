@@ -128,13 +128,13 @@ describe('DynamoDB', () => {
         expect(resp.data?.newPath?.thrdLevel?.frthLevel_3).toEqual(updatedRecord.data.newPath.thrdLevel.frthLevel_3)
     })
 
-    test('update a record on condition', async () => {
+    test('upsert exisiting record on condition not met', async () => {
 
         const updatedRecord = {
             uuid: record.uuid,
             record_id: record.record_id,
             data: {
-                active_at: '2023-10-01',
+                active_at: '2023-10-05',
                 event_data: {
                     'account_created': '3e2e3d894dea368a1040445163c01387',
                 },
@@ -148,17 +148,84 @@ describe('DynamoDB', () => {
             },
         }
 
-        await dynamodb.updateRecordNested(updatedRecord, {
+        await dynamodb.upsertRecordNested(updatedRecord, {
             conditionExpression: 'attribute_not_exists(#data.#active_at) or #data.#active_at > :active_at',
             expressionAttributeValues: {
-                ':active_at': { 'S': '2023-10-02' },
+                ':active_at': { 'S': '2023-10-05' },
             },
         })
         const resp = await dynamodb.getRecord(updatedRecord.uuid, updatedRecord.record_id as string)
         console.log(JSON.stringify(resp))
         expect(resp).toBeDefined()
-        expect(resp.data?.active_at).toEqual('2023-10-01')
+        expect(resp.data?.active_at).toBe('2023-10-01')
         expect(resp.data?.event_data['user:created']).toEqual(record.data.event_data['user:created'])
+    })
+    test('upsert exisiting record on condition met', async () => {
+
+        const updatedRecord = {
+            uuid: record.uuid,
+            record_id: record.record_id,
+            data: {
+                active_at: '2023-10-05',
+                event_data: {
+                    'account_created': '3e2e3d894dea368a1040445163c01387',
+                },
+                newPath: {
+                    thrdLevel: {
+                        frthLevel: faker.string.uuid(),
+                        frthLevel_2: faker.string.uuid(),
+                        frthLevel_3: faker.string.uuid(),
+                    },
+                },
+            },
+        }
+
+        await dynamodb.upsertRecordNested(updatedRecord, {
+            conditionExpression: 'attribute_not_exists(#data.#active_at) or #data.#active_at < :active_at',
+            expressionAttributeValues: {
+                ':active_at': { 'S': '2023-10-05' },
+            },
+        })
+        const resp = await dynamodb.getRecord(updatedRecord.uuid, updatedRecord.record_id as string)
+        console.log(JSON.stringify(resp))
+        expect(resp).toBeDefined()
+        expect(resp.data?.active_at).toBe('2023-10-05')
+        expect(resp.data?.event_data['user:created']).toEqual(record.data.event_data['user:created'])
+        expect(resp.data?.newPath?.thrdLevel?.frthLevel).toEqual(updatedRecord.data.newPath.thrdLevel.frthLevel)
+        expect(resp.data?.newPath?.thrdLevel?.frthLevel_2).toEqual(updatedRecord.data.newPath.thrdLevel.frthLevel_2)
+        expect(resp.data?.newPath?.thrdLevel?.frthLevel_3).toEqual(updatedRecord.data.newPath.thrdLevel.frthLevel_3)
+    })
+    test('upsert a new record with condition', async () => {
+
+        const updatedRecord = {
+            uuid: faker.string.uuid(),
+            record_id: record.record_id,
+            data: {
+                active_at: '2023-10-05',
+                event_data: {
+                    'account_created': '3e2e3d894dea368a1040445163c01387',
+                },
+                newPath: {
+                    thrdLevel: {
+                        frthLevel: faker.string.uuid(),
+                        frthLevel_2: faker.string.uuid(),
+                        frthLevel_3: faker.string.uuid(),
+                    },
+                },
+            },
+        }
+
+        await dynamodb.upsertRecordNested(updatedRecord, {
+            conditionExpression: 'attribute_not_exists(#data.#active_at) or #data.#active_at < :active_at',
+            expressionAttributeValues: {
+                ':active_at': { 'S': '2023-10-05' },
+            },
+        })
+        const resp = await dynamodb.getRecord(updatedRecord.uuid, updatedRecord.record_id as string)
+        console.log(JSON.stringify(resp))
+        expect(resp).toBeDefined()
+        expect(resp.data?.active_at).toBe('2023-10-05')
+        expect(resp.data?.event_data['user:created']).toBeUndefined()
         expect(resp.data?.newPath?.thrdLevel?.frthLevel).toEqual(updatedRecord.data.newPath.thrdLevel.frthLevel)
         expect(resp.data?.newPath?.thrdLevel?.frthLevel_2).toEqual(updatedRecord.data.newPath.thrdLevel.frthLevel_2)
         expect(resp.data?.newPath?.thrdLevel?.frthLevel_3).toEqual(updatedRecord.data.newPath.thrdLevel.frthLevel_3)
