@@ -1,5 +1,11 @@
 # @asalam/tynamo
 
+## 2.6.1
+
+### Patch Changes
+
+- 74c5b8b: update tsconfig target
+
 ## 2.6.0
 
 ### Minor Changes
