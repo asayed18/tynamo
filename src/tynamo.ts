@@ -580,7 +580,6 @@ export class Tynamo<PK extends string, SK extends string | undefined> {
             )
     }
 
-
     static isCheckError(err: Error): err is ConditionalCheckFailedException {
         return err.name === 'ConditionalCheckFailedException'
     }
@@ -682,14 +681,18 @@ export class Tynamo<PK extends string, SK extends string | undefined> {
             record: CompositeKeySchema<PK, SK>;
         },
     ) {
-        const expressionAttributeNames: any = {}
-        const expressionAttributeValues: any = {}
+        const expressionAttributeNames: Record<string, string> = {}
+        const expressionAttributeValues: Record<string, AttributeValue> = {}
         const updateExpressions: string[] = []
 
         const tagify = (key: string) => `${key.split('.').map(k => `#${convertToUnderscore(k)}`).join('.')}`
         const traverseAttributes = (attributes: CompositeKeySchema<PK, SK>, parentKey?: string) => {
             for (const [key, val] of Object.entries(attributes)) {
                 const currentKey = parentKey ? `${parentKey}.${key}` : key
+
+                // eslint-disable-next-line no-continue
+                if(currentKey === 'created_at') continue
+
                 const recursive = Tynamo.isNestedRecord(val)
                 if (
                     currentKey === this.pk ||
@@ -715,6 +718,13 @@ export class Tynamo<PK extends string, SK extends string | undefined> {
             }
         }
         traverseAttributes(record)
+
+        if ('created_at' in record) {
+            const tag = tagify('created_at')
+            updateExpressions.push(`${tag} = if_not_exists(${tag}, :createdAt)`)
+            expressionAttributeNames[tag] = 'created_at'
+            expressionAttributeValues[':createdAt'] = record.created_at
+        }
 
         const updateExpression = `SET ${updateExpressions.join(', ')}`
         const result = {
