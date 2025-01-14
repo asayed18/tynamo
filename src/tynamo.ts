@@ -417,7 +417,6 @@ export class Tynamo<PK extends string, SK extends string | undefined> {
                     pick(record, [this.pk, this.sk ?? '']),
                 )
                 const originalRecord = await this.getRecord(record[this.pk], this.sk && record[this.sk])
-                console.log(originalRecord)
                 const mergedRecord = this.mergeRecords(record, originalRecord, true, [])
                 return this.putRecord(mergedRecord, { marshallOptions: options?.marshallOptions })
             }
