@@ -1,5 +1,12 @@
 # @asalam/tynamo
 
+## 2.7.0
+
+### Minor Changes
+
+- 5e6b112: upsertRecordNested - Option for insertOnly attributes
+  Possibility to select the attributes needed for insert only, they will be skipped in update case.
+
 ## 2.6.1
 
 ### Patch Changes
