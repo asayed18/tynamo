@@ -54,6 +54,30 @@ describe('DynamoDB', () => {
         expect(resp).toBeDefined()
     })
 
+    describe('generateUpdateExpression', () => {
+        test('when record does not exists yet, do update created_at', async () => {
+            const uuid = faker.string.uuid()
+            const updatedRecord = { uuid, record_id: `${uuid}_user`, created_at: '2023-10-01' }
+            await dynamodb.upsertRecordNested(updatedRecord)
+        
+            const resp = await dynamodb.getRecord(updatedRecord.uuid, updatedRecord.record_id as string)
+            expect(resp.created_at).toBe('2023-10-01')
+        })
+
+        test('when record exists, do not update created_at', async () => {
+            const uuid = faker.string.uuid()
+            const updatedRecord = { uuid, record_id: `${uuid}_user`, data: {created_at: '2023-10-01'} }
+            await dynamodb.putRecord(updatedRecord)
+
+            await dynamodb.upsertRecordNested({...updatedRecord, data: {created_at: '2023-10-02'}}, {
+                insertOnly: ['data.created_at']
+            })
+        
+            const resp = await dynamodb.getRecord(updatedRecord.uuid, updatedRecord.record_id as string)
+            expect(resp.data?.created_at).toBe('2023-10-01')
+        })
+    })
+
     test('update not found record', async () => {
         const uuid = faker.string.uuid()
         const updatedRecord = {
