@@ -339,10 +339,25 @@ export class Tynamo<PK extends string, SK extends string | undefined> {
         }
     }
 
+    /**
+     * Updates a nested record in DynamoDB. If the update fails due to schema mismatch,
+     * it will fetch the original record, merge the changes, and put the merged record.
+     * 
+     * @param record - The record to update with nested attributes
+     * @param options - Optional parameters
+     * @param options.marshallOptions - Options for marshalling the DynamoDB record - same like dynamodb package
+     * @param options.insertOnly - List of attribute keys that should only be inserted, not updated.
+     *                            For nested keys, use dot notation (e.g. "data.created_at").
+     * @param options.conditionExpression - A condition expression to check before updating
+     * @param options.expressionAttributeValues - Additional Attribute Values for any condition expression variables
+     * @returns The updated record if successful, undefined if condition check fails
+     * @throws {DynamodbError} If the update fails for reasons other than schema mismatch
+     */
     async upsertRecordNested(record: CompositeKeySchema<PK, SK>, options?: {
         marshallOptions?: marshallOptions,
         conditionExpression?: string,
         expressionAttributeValues?: Record<string, AttributeValue>,
+        insertOnly?: string[],
     }) {
         const {
             UpdateExpression,
@@ -352,6 +367,7 @@ export class Tynamo<PK extends string, SK extends string | undefined> {
             _marshallOptions: { removeUndefinedValues: true, ...options?.marshallOptions },
             exclude: [],
             include: true,
+            insertOnly: options?.insertOnly,
             record,
         })
 
@@ -674,25 +690,22 @@ export class Tynamo<PK extends string, SK extends string | undefined> {
      * @returns An object containing  UpdateExpression, ExpressionAttributeNames, and ExpressionAttributeValues.
      */
     private generateUpdateExpression(
-        { record, include, exclude, _marshallOptions }: {
+        { record, include, exclude, _marshallOptions, insertOnly }: {
             _marshallOptions?: marshallOptions;
             exclude: string[];
             include: boolean | string[];
             record: CompositeKeySchema<PK, SK>;
+            insertOnly?: string[];
         },
     ) {
         const expressionAttributeNames: Record<string, string> = {}
         const expressionAttributeValues: Record<string, AttributeValue> = {}
         const updateExpressions: string[] = []
-
+        const insertKeys = new Set(insertOnly)
         const tagify = (key: string) => `${key.split('.').map(k => `#${convertToUnderscore(k)}`).join('.')}`
         const traverseAttributes = (attributes: CompositeKeySchema<PK, SK>, parentKey?: string) => {
             for (const [key, val] of Object.entries(attributes)) {
                 const currentKey = parentKey ? `${parentKey}.${key}` : key
-
-                // eslint-disable-next-line no-continue
-                if(currentKey === 'created_at') continue
-
                 const recursive = Tynamo.isNestedRecord(val)
                 if (
                     currentKey === this.pk ||
@@ -708,24 +721,17 @@ export class Tynamo<PK extends string, SK extends string | undefined> {
                     traverseAttributes(val, currentKey)
                 } else {
                     const placeholder = tagify(currentKey)
-                    const valuePlaceholder = `:value${Object.keys(expressionAttributeValues).length + 1}`
+                    const valueKey = `:value${Object.keys(expressionAttributeValues).length + 1}`
+                    const valuePlaceholder = insertKeys.has(currentKey) ? `if_not_exists(${placeholder}, ${valueKey})` : valueKey
 
                     currentKey.split('.').forEach(k => { expressionAttributeNames[`#${convertToUnderscore(k)}`] = k })
 
-                    expressionAttributeValues[valuePlaceholder] = val
+                    expressionAttributeValues[valueKey] = val
                     updateExpressions.push(`${placeholder} = ${valuePlaceholder}`)
                 }
             }
         }
         traverseAttributes(record)
-
-        if ('created_at' in record) {
-            const tag = tagify('created_at')
-            updateExpressions.push(`${tag} = if_not_exists(${tag}, :createdAt)`)
-            expressionAttributeNames[tag] = 'created_at'
-            expressionAttributeValues[':createdAt'] = record.created_at
-        }
-
         const updateExpression = `SET ${updateExpressions.join(', ')}`
         const result = {
             UpdateExpression: updateExpression,

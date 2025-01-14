@@ -66,13 +66,15 @@ describe('DynamoDB', () => {
 
         test('when record exists, do not update created_at', async () => {
             const uuid = faker.string.uuid()
-            const updatedRecord = { uuid, record_id: `${uuid}_user`, created_at: '2023-10-01' }
+            const updatedRecord = { uuid, record_id: `${uuid}_user`, data: {created_at: '2023-10-01'} }
             await dynamodb.putRecord(updatedRecord)
 
-            await dynamodb.upsertRecordNested({...updatedRecord, created_at: '2023-10-02'})
+            await dynamodb.upsertRecordNested({...updatedRecord, data: {created_at: '2023-10-02'}}, {
+                insertOnly: ['data.created_at']
+            })
         
             const resp = await dynamodb.getRecord(updatedRecord.uuid, updatedRecord.record_id as string)
-            expect(resp.created_at).toBe('2023-10-01')
+            expect(resp.data?.created_at).toBe('2023-10-01')
         })
     })
 
