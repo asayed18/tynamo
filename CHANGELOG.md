@@ -1,5 +1,11 @@
 # @asalam/tynamo
 
+## 2.8.0
+
+### Minor Changes
+
+- 3ad5ea5: Fix Update failure for list-type attribute
+
 ## 2.7.0
 
 ### Minor Changes
