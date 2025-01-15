@@ -581,7 +581,7 @@ export class Tynamo<PK extends string, SK extends string | undefined> {
     }
 
     static isNestedRecord(value: unknown): value is DynamoDbSchema {
-        if (value && typeof value === 'object' && Object.keys(value).length > 0) {
+        if (value && typeof value === 'object' && !Array.isArray(value) && Object.keys(value).length > 0) {
             return true
         }
         return false
